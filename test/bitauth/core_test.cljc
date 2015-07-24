@@ -1,6 +1,9 @@
 (ns bitauth.core-test
-  (:require [bitauth.core :refer :all :as bitauth]
-            [clojure.test :refer :all]))
+  (:require [bitauth.core :refer :all :as bitauth])
+  #?(:clj (:require [clojure.test :refer :all]))
+  #?@(:cljs [(:require-macros [cemerick.cljs.test :refer
+                               (is deftest with-test run-tests testing test-var)])
+             (:require [cemerick.cljs.test :as t])]))
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= \0
