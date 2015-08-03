@@ -16,47 +16,25 @@
   :node-dependencies [[source-map-support "0.3.2"]]
   :plugins [[lein-npm "0.5.0"]
             [lein-cljsbuild "1.0.6"]]
-  :jar-exclusions [#"js/.*\.js"]
 
   :cljsbuild {:builds {:dev
-                       {:source-paths ["src/main/clojure"]
+                       {:source-paths ["src-cljs"]
                         :compiler {:pretty-print true
                                    :output-to "target/js/bitauth.js"
-                                   :optimizations :whitespace}}}}
-
-  :profiles {:dev {:dependencies [[cljsbuild "1.0.6"]]
-                   :hooks [leiningen.cljsbuild]}
-             :test-cljs {:cljsbuild
-                         {:builds
-                          {:test {:source-paths ["test"]
-                                  :notify-command ["phantomjs" "phantom/unit-test.js" "phantom/unit-test.html"]
-                                  :compiler {:output-to "target/cljs-test/testable.js"
-                                             :pretty-print true
-                                             :optimizations :whitespace}}}}}
-
-             :jar {:cljsbuild
-                   {:builds
-                    {:dev {:compiler
-                           {:output-to "/tmp/bitauth/target/js/out/bitauth.js"
-                            :output-dir "/tmp/bitauth/target/js/out"
-                            :pretty-print false
-                            :optimizations :advanced}}}}}
-
-             :aot {:aliases {"check" ["do" "clean," "compile"]}
-                   :hooks [leiningen.cljsbuild]
-                   :target-path "/tmp/bitauth/target/%s"
-                   :compile-path "/tmp/bitauth/target/classes"
-                   :clean-targets ^{:protect false} ["/tmp/bitauth/target"]
-                   :aot :all
-                   :cljsbuild {:builds
-                               {:dev {:compiler
-                                      {:output-to "/tmp/bitauth/target/js/out/bitauth.js"
-                                       :output-dir "/tmp/bitauth/target/js/out"
-                                       :pretty-print false
-                                       :optimizations :advanced}}}}}}
+                                   :optimizations :whitespace}}
+                       :test
+                       {:source-paths ["src-cljs" "test"]
+                        :compiler {:output-to "resources/private/js/unit-test.js"
+                                   :optimizations :whitespace
+                                   :pretty-print true}}}
+              :test-commands
+              {"phantomjs" ["phantomjs"
+                            "phantom/unit-test.js"
+                            "resources/private/html/unit-test.html"]}}
 
   :scm {:name "git"
         :url "https://github.com/xcthulhu/clj-bitauth.git"}
+
   :pom-addition [:developers [:developer
                               [:id "xcthulhu"]
                               [:name "Matthew Wampler-Doty"]]]
