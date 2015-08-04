@@ -13,10 +13,14 @@
                  [org.clojure/data.json "0.2.6"
                   :classifier "aot"]]
   :jvm-opts ^:replace ["-Xmx1g" "-server"]
-  :node-dependencies [[source-map-support "0.3.2"]]
+  :node-dependencies [[source-map-support "0.3.2"]
+                      [bitauth "0.2.1"]
+                      [uglify-js "2.4.24"]
+                      [browserify "11.0.1"]]
   :plugins [[lein-npm "0.5.0"]
             [lein-cljsbuild "1.0.6"]]
 
+  :clean-targets ["target/" "dist/" "lib/" "node_modules/"]
   :cljsbuild {:builds {:dev
                        {:source-paths ["src-cljs"]
                         :compiler {:pretty-print true

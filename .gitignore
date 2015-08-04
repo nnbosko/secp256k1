@@ -12,3 +12,6 @@ pom.xml.asc
 *~
 \#*\#
 /resources/private/js/unit-test.js
+/node_modules
+/dist
+/lib

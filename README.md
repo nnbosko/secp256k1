@@ -1,6 +1,14 @@
 # BitAuth
 
-This is a clojure port of bitauth: https://github.com/bitpay/bitauth
+This is a clojure port of bitauth: [https://github.com/bitpay/bitauth]()
+
+# Building
+
+At command line, type:
+
+```bash
+lein npm install
+```
 
 # Testing
 
