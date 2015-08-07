@@ -3,7 +3,7 @@
                     [clojure.test :refer :all]))
   #?(:cljs (:require-macros
             [cemerick.cljs.test :refer
-             (is deftest with-test run-tests testing test-var)]))
+             (is deftest with-test run-tests testing are)]))
   #?(:cljs (:require [cemerick.cljs.test :as t]
                      [bitauth.core :as bitauth])))
 

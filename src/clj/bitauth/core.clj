@@ -9,20 +9,20 @@
            java.security.MessageDigest
            java.security.SecureRandom
            java.util.Arrays
-           org.bouncycastle.asn1.ASN1InputStream
-           org.bouncycastle.asn1.DERInteger
-           org.bouncycastle.asn1.DERSequenceGenerator
-           org.bouncycastle.asn1.sec.SECNamedCurves
-           org.bouncycastle.crypto.digests.RIPEMD160Digest
-           org.bouncycastle.crypto.generators.ECKeyPairGenerator
-           org.bouncycastle.crypto.params.ECDomainParameters
-           org.bouncycastle.crypto.params.ECKeyGenerationParameters
-           org.bouncycastle.crypto.params.ECPrivateKeyParameters
-           org.bouncycastle.crypto.params.ECPublicKeyParameters
-           org.bouncycastle.crypto.signers.ECDSASigner
-           org.bouncycastle.util.encoders.Hex))
+           org.spongycastle.asn1.ASN1InputStream
+           org.spongycastle.asn1.DERInteger
+           org.spongycastle.asn1.DERSequenceGenerator
+           org.spongycastle.asn1.sec.SECNamedCurves
+           org.spongycastle.crypto.digests.RIPEMD160Digest
+           org.spongycastle.crypto.generators.ECKeyPairGenerator
+           org.spongycastle.crypto.params.ECDomainParameters
+           org.spongycastle.crypto.params.ECKeyGenerationParameters
+           org.spongycastle.crypto.params.ECPrivateKeyParameters
+           org.spongycastle.crypto.params.ECPublicKeyParameters
+           org.spongycastle.crypto.signers.ECDSASigner
+           org.spongycastle.util.encoders.Hex))
 
-;; The secp256k1 curve object provided by BouncyCastle and used by almost everything
+;; The secp256k1 curve object provided by SpongyCastle and used by almost everything
 (defonce ^:private curve
   (let [params (SECNamedCurves/getByName "secp256k1")]
     (ECDomainParameters. (.getCurve params)
@@ -126,12 +126,12 @@
   "Sign some data with a private-key"
   ^String [^String data, ^String priv-key]
   (let [input (-> data sha256 hex-to-array)
-        bouncy-priv-key (-> priv-key
+        spongy-priv-key (-> priv-key
                             (BigInteger. 16)
                             (ECPrivateKeyParameters. curve))
         sigs (->
               (ECDSASigner.)
-              (doto (.init true bouncy-priv-key))
+              (doto (.init true spongy-priv-key))
               (.generateSignature input))
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
@@ -140,14 +140,14 @@
         (.addObject (DERInteger. (get sigs 1)))))
     (-> bos .toByteArray array-to-hex)))
 
-(defn verify
+(defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
   [input pub-key hex-signature]
-  (let [bouncy-pub-key (-> pub-key
+  (let [spongy-pub-key (-> pub-key
                            x962-point-decode
                            (ECPublicKeyParameters. curve))
         signature (hex-to-array hex-signature)
-        verifier (doto (ECDSASigner.) (.init false bouncy-pub-key))]
+        verifier (doto (ECDSASigner.) (.init false spongy-pub-key))]
     (with-open [decoder (ASN1InputStream. signature)]
       (let [sequence (.readObject decoder)
             r (-> sequence (.getObjectAt 0) .getValue)
