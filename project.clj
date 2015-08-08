@@ -1,8 +1,8 @@
-(defproject bitauth "0.0.1-SNAPSHOT"
+(defproject bitauth "0.0.1"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
-  :description "A Clojure/ClojureScript port of BitPay's bitauth authentical protocol"
+  :description "A Clojure/ClojureScript port of BitPay's BitAuth authentical protocol"
   :url "https://github.com/xcthulhu/clj-bitauth"
   :min-lein-version "2.3.4"
   :source-paths ["src/clj" "src/cljs"]
@@ -18,7 +18,7 @@
             [lein-shell "0.4.1"]]
   :hooks [leiningen.cljsbuild]
   :prep-tasks [["shell" "./scripts/install_bitpay_bitauth.sh"] "javac" "compile"]
-  :clean-targets ^{:protect false} ["target/" "dist/" "lib/" "node_modules/" "resources/bitpay/"]
+  :clean-targets ["target/" "dist/" "lib/" "node_modules/"]
   :cljsbuild
   {:builds {:bitauth
             {:source-paths ["src/cljs" "dist"]
