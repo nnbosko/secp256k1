@@ -1,10 +1,26 @@
-# BitAuth
+# BitAuth (in Clojure/ClojureScript)
 
-This is a clojure port of bitauth: [https://github.com/bitpay/bitauth]()
+[![Clojars Project](http://clojars.org/bitauth/latest-version.svg)](http://clojars.org/bitauth)
+This is a Clojure/ClojureScript port of BitPay's bitauth protocol: [https://github.com/bitpay/bitauth]()
+
+The goals of this project are as follows:
+
+✅ Provide a 100% API compatible Clojure implementation of BitPay's BitAuth <br/>
+✅ Wrap BitPay's [BitAuth npm module](https://www.npmjs.com/package/bitauth) in ClojureScript (well, their browser bundle anyway), replete isomorphic Clojure/ClojureScript compatibility testing <br/>
+❌Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers <br/>
+❌Provide static methods for using BitAuth within Java
+
+## Installation
+
+Simply include in your `project.clj` file:
+
+```clj
+:dependencies [[bitauth "0.0.1"]]
+```
+
+(or whatever is the latest version according to clojars...)
 
 # Testing
-
-To run tests
 
 Clojure:
 
@@ -12,9 +28,11 @@ Clojure:
 lein test bitauth.core-test
 ```
 
-Clojure Script:
+ClojureScript:
 
 ```bash
-lein cljsbuild once # test once
-lein cljsbuild auto # test continuously
+# test once
+rm -rf target/ && lein cljsbuild once
+# test continuously
+rm -rf target/ && lein cljsbuild auto
 ```
