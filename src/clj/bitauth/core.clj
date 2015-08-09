@@ -79,14 +79,14 @@
 
 (defn- x962-point-encode
   "Encode a public key as hex using X9.62 compression"
-  ^String [pub-key]
+  ^String [^String pub-key]
   (let [x (-> pub-key .getX .toBigInteger (.toString 16))
         y-even? (-> pub-key .getY .toBigInteger even?)]
     (str (if y-even? "02" "03") x)))
 
 (defn- x962-point-decode
   "Decode a public key using X9.62 compression"
-  [^String encoded-key]
+  ^String [^String encoded-key]
   (->> encoded-key
        hex-to-array
        (.decodePoint (.getCurve curve))))
@@ -142,7 +142,7 @@
 
 (defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
-  [input pub-key hex-signature]
+  ^Boolean [^String input, ^String pub-key, ^String hex-signature]
   (let [spongy-pub-key (-> pub-key
                            x962-point-decode
                            (ECPublicKeyParameters. curve))
@@ -156,12 +156,14 @@
 
 (defn verify-signature
   "Verifies that a string of data has been signed."
-  [data pub-key hex-signature]
-  (verify (-> data sha256 hex-to-array) pub-key hex-signature))
+  ^Boolean [^String data, ^String pub-key, ^String hex-signature]
+  (try
+    (verify (-> data sha256 hex-to-array) pub-key hex-signature)
+    (catch Exception _ false)))
 
 (defn validate-sin
   "Verify that a SIN is valid"
-  [sin]
+  ^Boolean [^String sin]
   (let [pub-with-checksum (-> sin base58/decode array-to-hex)
         len (count pub-with-checksum)
         expected-checksum (-> pub-with-checksum (subs (- len 8) len))
