@@ -6,8 +6,8 @@ This is a Clojure/ClojureScript port of BitPay's bitauth protocol: [https://gith
 The goals of this project are as follows:
 
 ✅ Provide a 100% API compatible Clojure implementation of BitPay's BitAuth <br/>
-✅ Wrap BitPay's [BitAuth npm module](https://www.npmjs.com/package/bitauth) in ClojureScript (well, their browser bundle anyway), replete isomorphic Clojure/ClojureScript compatibility testing <br/>
-❌Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers <br/>
+✅ Wrap BitPay's BitAuth [npm module](https://www.npmjs.com/package/bitauth) in ClojureScript (well, their derived browser bundle anyway), replete isomorphic Clojure/ClojureScript compatibility testing <br/>
+✅ Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers <br/>
 ❌Provide static methods for using BitAuth within Java
 
 ## Installation
@@ -15,7 +15,7 @@ The goals of this project are as follows:
 Simply include in your `project.clj` file:
 
 ```clj
-:dependencies [[bitauth "0.0.1"]]
+:dependencies [[bitauth "0.0.2"]]
 ```
 
 (or whatever is the latest version according to clojars...)
@@ -35,4 +35,10 @@ ClojureScript:
 rm -rf target/ && lein cljsbuild once
 # test continuously
 rm -rf target/ && lein cljsbuild auto
+```
+
+# Deploying
+
+```bash
+lein deploy clojars
 ```
