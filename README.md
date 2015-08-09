@@ -1,6 +1,7 @@
 # BitAuth (in Clojure/ClojureScript)
 
 [![Clojars Project](http://clojars.org/bitauth/latest-version.svg)](http://clojars.org/bitauth)
+
 This is a Clojure/ClojureScript port of BitPay's bitauth protocol: [https://github.com/bitpay/bitauth]()
 
 The goals of this project are as follows:
@@ -25,16 +26,17 @@ Simply include in your `project.clj` file:
 Clojure:
 
 ```bash
-lein test bitauth.core-test
+lein test bitauth.core-test bitauth.middleware-test
 ```
 
 ClojureScript:
 
 ```bash
 # test once
-rm -rf target/ && lein cljsbuild once
+lein cljsbuild test
+
 # test continuously
-rm -rf target/ && lein cljsbuild auto
+lein cljsbuild auto
 ```
 
 # Deploying
