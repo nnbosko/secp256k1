@@ -1,10 +1,11 @@
-(defproject bitauth "0.0.1"
+(defproject bitauth "0.0.2"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
   :description "A Clojure/ClojureScript port of BitPay's BitAuth authentical protocol"
   :url "https://github.com/xcthulhu/clj-bitauth"
   :min-lein-version "2.3.4"
+  :jar-exclusions [#"~|\.DS_Store"]
   :source-paths ["src/clj" "src/cljs"]
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.48"]
