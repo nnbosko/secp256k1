@@ -1,5 +1,8 @@
 {:dev {:test-paths ["test"]
        :plugins [[com.cemerick/clojurescript.test "0.3.3"]]
+       :dependencies [[compojure "1.4.0"]
+                      [http-kit "2.1.19"]
+                      [ring/ring-defaults "0.1.5"]]
        :cljsbuild
        {:builds {:bitauth
                  {:source-paths ["test"]

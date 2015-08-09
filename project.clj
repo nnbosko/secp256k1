@@ -9,6 +9,7 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.48"]
                  [com.madgag.spongycastle/core "1.52.0.0"]
+                 [ring/ring-core "1.4.0"]
                  [base58 "0.1.0"]]
   :node-dependencies [[bitauth "0.2.1"]
                       [uglify-js "2.4.24"]
@@ -18,7 +19,7 @@
             [lein-shell "0.4.1"]]
   :hooks [leiningen.cljsbuild]
   :prep-tasks [["shell" "./scripts/install_bitpay_bitauth.sh"] "javac" "compile"]
-  :clean-targets ["target/" "dist/" "lib/" "node_modules/"]
+  :clean-targets ["target/" "dist/" "lib/" "node_modules/" "pom.xml" "pom.xml.asc"]
   :cljsbuild
   {:builds {:bitauth
             {:source-paths ["src/cljs" "dist"]
