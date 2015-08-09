@@ -1,6 +1,7 @@
 # BitAuth (in Clojure/ClojureScript)
 
 [![Clojars Project](http://clojars.org/bitauth/latest-version.svg)](http://clojars.org/bitauth)
+
 This is a Clojure/ClojureScript port of BitPay's bitauth protocol: [https://github.com/bitpay/bitauth]()
 
 The goals of this project are as follows:
