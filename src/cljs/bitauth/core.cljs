@@ -23,14 +23,14 @@
 
 (defn verify-signature
   "Verifies that a string of data has been signed."
-  (^Bool [^String data, ^String pub-key, ^String hex-signature]
-         (.verifySignature js/BitAuth data pub-key hex-signature))
-  (^Bool [^String data, ^String pub-key, ^String hex-signature, call-back]
-         (.verifySignature js/BitAuth data pub-key hex-signature call-back)))
+  (^Boolean [^String data, ^String pub-key, ^String hex-signature]
+            (.verifySignature js/BitAuth data pub-key hex-signature))
+  (^Boolean [^String data, ^String pub-key, ^String hex-signature, call-back]
+            (.verifySignature js/BitAuth data pub-key hex-signature call-back)))
 
 (defn validate-sin
   "Verify that a SIN is valid"
-  (^Bool [^String sin]
-         (.validateSin js/BitAuth sin))
-  (^Bool [^String sin, call-back]
-         (.validateSin js/BitAuth sin call-back)))
+  (^Boolean [^String sin]
+            (.validateSin js/BitAuth sin))
+  (^Boolean [^String sin, call-back]
+            (.validateSin js/BitAuth sin call-back)))
