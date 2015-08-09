@@ -26,6 +26,7 @@
             {:source-paths ["src/cljs" "dist"]
              :compiler
              {:output-to "target/js/bitauth.js"
+              :source-map "target/js/bitauth.js.map"
               :optimizations :advanced
               :pretty-print false
               :foreign-libs
