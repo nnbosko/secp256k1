@@ -9,7 +9,6 @@ The goals of this project are as follows:
 ✅ Provide a 100% API compatible Clojure implementation of BitPay's BitAuth <br/>
 ✅ Wrap BitPay's BitAuth [npm module](https://www.npmjs.com/package/bitauth) in ClojureScript (well, their derived browser bundle anyway), replete isomorphic Clojure/ClojureScript compatibility testing <br/>
 ✅ Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers <br/>
-❌Provide static methods for using BitAuth within Java
 
 ## Installation
 
