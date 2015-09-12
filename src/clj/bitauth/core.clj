@@ -19,8 +19,7 @@
            org.spongycastle.crypto.params.ECKeyGenerationParameters
            org.spongycastle.crypto.params.ECPrivateKeyParameters
            org.spongycastle.crypto.params.ECPublicKeyParameters
-           org.spongycastle.crypto.signers.ECDSASigner
-           org.spongycastle.util.encoders.Hex))
+           org.spongycastle.crypto.signers.ECDSASigner))
 
 ;; The secp256k1 curve object provided by SpongyCastle and used by almost everything
 (defonce ^:private curve
@@ -57,16 +56,14 @@
   ^String [^String s]
   (-> (MessageDigest/getInstance "SHA-256")
       (.digest (hex-to-array s))
-      Hex/encode
-      String.))
+      array-to-hex))
 
 (defn- sha256
   "Get the SHA256 hash of a string"
   ^String [^String s]
   (-> (MessageDigest/getInstance "SHA-256")
       (.digest (.getBytes s))
-      Hex/encode
-      String.))
+      array-to-hex))
 
 (defn- ripemd-160-hex
   "Get the ripemd-160-hex hash of a hex string"
@@ -75,7 +72,7 @@
         d (doto (RIPEMD160Digest.) (.update a 0 (count a)))
         o (byte-array (.getDigestSize d))]
     (.doFinal d o 0)
-    (-> o Hex/encode String.)))
+    (array-to-hex o)))
 
 (defn- x962-point-encode
   "Encode a public key as hex using X9.62 compression"

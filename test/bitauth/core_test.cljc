@@ -1,11 +1,10 @@
 (ns bitauth.core-test
   #?(:clj (:require [bitauth.core :as bitauth]
                     [clojure.test :refer :all]))
-  #?(:cljs (:require-macros
-            [cemerick.cljs.test :refer
-             (is deftest with-test run-tests testing are)]))
-  #?(:cljs (:require [cemerick.cljs.test :as t]
-                     [bitauth.core :as bitauth])))
+  #?(:cljs (:require
+            [bitauth.core :as bitauth]
+            [cemerick.cljs.test
+             :refer-macros [is deftest with-test run-tests testing are]])))
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= \0
@@ -60,27 +59,27 @@
    (deftest x962-point-encode-decode
      (testing "x962-point-encode is the left inverse of x962-point-decode"
        (letfn [(encode-decode [x]
-                 (#'bitauth/x962-point-encode
-                  (#'bitauth/x962-point-decode x)))]
+                              (#'bitauth/x962-point-encode
+                               (#'bitauth/x962-point-decode x)))]
          (are [y] (= y (encode-decode y))
-              "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
-              "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
-              "03816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846"
-              "0233bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd1"
-              "02e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e"
-              "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
-              "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
-              "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))))
+           "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
+           "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
+           "03816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846"
+           "0233bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd1"
+           "02e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e"
+           "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
+           "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
+           "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))))
 
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
     (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
       (are [x] (bitauth/verify-signature x pub-key (bitauth/sign x priv-key))
-           "foo"
-           "bar"
-           "yabba dabba dooo"
-           "I wanna hold 'em like they do in Texas, please
+        "foo"
+        "bar"
+        "yabba dabba dooo"
+        "I wanna hold 'em like they do in Texas, please
             Fold 'em, let 'em, hit me, raise it, baby, stay with me (I love it)
             Love game intuition play the cards with Spades to start
             And after he's been hooked I'll play the one that's on his heart")))
@@ -100,13 +99,13 @@
 (deftest sin-tests
   (testing "Reference sins are valid"
     (are [x] (bitauth/validate-sin x)
-         "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
-         "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
-         "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
-         "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
-         "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
-         "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
-         "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X")))
+      "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
+      "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
+      "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
+      "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
+      "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
+      "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
+      "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X")))
 
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
@@ -117,13 +116,13 @@
                      bitauth/get-sin-from-public-key)))
       (is (bitauth/validate-sin sin))
       (are [x] (bitauth/verify-signature x pub (bitauth/sign x priv))
-           "trololololol"
-           "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
-           "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
-           "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
-           "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
-           "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
-           "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
-           "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))))
+        "trololololol"
+        "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
+        "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
+        "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
+        "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
+        "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
+        "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
+        "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))))
 
 (comment (run-tests))
