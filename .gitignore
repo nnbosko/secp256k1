@@ -17,3 +17,5 @@ pom.xml.asc
 /lib
 /.cljs_rhino_repl
 \*cider-repl*\*
+.idea/
+bitauth.iml
