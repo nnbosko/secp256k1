@@ -86,10 +86,15 @@
         "I wanna hold 'em like they do in Texas, please
             Fold 'em, let 'em, hit me, raise it, baby, stay with me (I love it)
             Love game intuition play the cards with Spades to start
-            And after he's been hooked I'll play the one that's on his heart")))
+            And after he's been hooked I'll play the one that's on his heart"
+        "☕️   ⓝ  🀤  ⎈  ∲")))
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
+      #?(:clj 
+         (is (bitauth/verify-signature
+              "☕️   ⓝ  🀤  ⎈  ∲" pub-key
+              "3045022100d4b8bac571af87880f07c13dc2c523656b0ac86eec148fd61da7769a7fc2013302202b1f3872be27a0f9502fb3bc432bb2481ce27086560382277caa24e9b5a011e5")))
       (is (bitauth/verify-signature
            "foo" pub-key
            "3046022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702210093c2d746fda29e73df9ed3b0221980f98fefce88a6842e75f746b3f601a10860"))
