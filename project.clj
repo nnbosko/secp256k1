@@ -7,8 +7,9 @@
   :min-lein-version "2.3.4"
   :jar-exclusions [#"\.DS_Store"]
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
+  :java-source-paths ["src/java"]
   :dependencies [[base58 "0.1.0"]
-                 [cljsjs/bitauth "0.2.1"] 
+                 [cljsjs/bitauth "0.2.1"]
                  [com.madgag.spongycastle/core "1.52.0.0"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.48"]
