@@ -2,14 +2,15 @@
 
 [![Clojars Project](http://clojars.org/bitauth/latest-version.svg)](http://clojars.org/bitauth)
 
-This is a Clojure(Script) port of BitPay's bitauth protocol: [https://github.com/bitpay/bitauth](https://github.com/bitpay/bitauth)
+This is a Clojure(Script) port of BitPay's *BitAuth* protocol: [https://github.com/bitpay/bitauth](https://github.com/bitpay/bitauth)
 
 The goals of this project are as follows:
 
 ✅ Provide a 100% API compatible Clojure implementation of BitPay's BitAuth <br/>
 ✅ Wrap BitPay's BitAuth [npm module](https://www.npmjs.com/package/bitauth) in ClojureScript (well, their derived browser bundle anyway), replete isomorphic Clojure ⇔ ClojureScript compatibility testing <br/>
-✅ Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers <br/>
-❌Expose a Java interface so baristas can use our efforts too
+✅ Provide [compojure](https://github.com/weavejester/compojure) middleware for checking BitAuth headers that is compatible with BitPay's [middleware for express.js](https://github.com/bitpay/bitauth/blob/master/lib/middleware/bitauth.js)<br/>
+❌Give an [interceptor](https://github.com/JulianBirch/cljs-ajax/blob/master/docs/interceptors.md) for [cljs-ajax](https://github.com/JulianBirch/cljs-ajax) so appropriate headers can be derived and slapped on to server calls for compojure/express middleware<br/>
+✅Expose a Java interface to our core library so baristas can use our efforts too
 
 ## Installation
 
