@@ -91,6 +91,7 @@
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
+      ;; TODO: I don't work for ClojureScript, this is a problem with BitPay's javascript implementation which hates unicode
       #?(:clj 
          (is (bitauth/verify-signature
               "☕️   ⓝ  🀤  ⎈  ∲" pub-key
