@@ -1,14 +1,21 @@
 (ns bitauth.core
-  (:require [cljsjs.bitauth]))
+  "A ClojureScript implementation of BitPay's BitAuth protocol
 
-(defn get-public-key-from-private-key
+  https://github.com/bitpay/bitauth
+  http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
+
+  (:require [bitauth.schema :refer [Hex Base58]]
+            [cljsjs.bitauth]
+            [schema.core :as schema :include-macros true]))
+
+(schema/defn get-public-key-from-private-key :- Hex
   "Generate a public key from a private key"
-  ^String [^String priv-key]
+  [priv-key :- Hex]
   (.getPublicKeyFromPrivateKey js/bitauth priv-key))
 
-(defn get-sin-from-public-key
+(schema/defn get-sin-from-public-key :- Base58
   "Generate a SIN from a compressed public key"
-  ^String [^String pub-key]
+  [pub-key :- Hex]
   (.getSinFromPublicKey js/bitauth pub-key))
 
 (defn generate-sin
@@ -16,21 +23,21 @@
   []
   (-> js/bitauth .generateSin (js->clj :keywordize-keys true)))
 
-(defn sign
+(schema/defn sign :- Hex
   "Sign some data with a private-key"
-  ^String [^String data, ^String priv-key]
+  [data :- schema/Str, priv-key :- Hex]
   (.sign js/bitauth data priv-key))
 
-(defn verify-signature
+(schema/defn verify-signature :- schema/Bool
   "Verifies that a string of data has been signed."
-  (^Boolean [^String data, ^String pub-key, ^String hex-signature]
-            (.verifySignature js/bitauth data pub-key hex-signature))
-  (^Boolean [^String data, ^String pub-key, ^String hex-signature, call-back]
-            (.verifySignature js/bitauth data pub-key hex-signature call-back)))
+  ([data :- schema/Str, pub-key :- Hex, hex-signature :- Hex]
+   (.verifySignature js/bitauth data pub-key hex-signature))
+  ([data :- schema/Str, pub-key :- Hex, hex-signature :- Hex, call-back]
+   (.verifySignature js/bitauth data pub-key hex-signature call-back)))
 
-(defn validate-sin
+(schema/defn validate-sin :- schema/Bool
   "Verify that a SIN is valid"
-  (^Boolean [^String sin]
-            (.validateSin js/bitauth sin))
-  (^Boolean [^String sin, call-back]
-            (.validateSin js/bitauth sin call-back)))
+  ([sin :- Base58]
+   (.validateSin js/bitauth sin))
+  ([sin :- Base58, call-back]
+   (.validateSin js/bitauth sin call-back)))
