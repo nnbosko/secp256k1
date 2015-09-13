@@ -21,7 +21,7 @@ Simply include in your `project.clj` file:
 
 (or whatever is the latest version according to clojars...)
 
-# Testing
+## Testing
 
 Clojure:
 
@@ -36,7 +36,7 @@ ClojureScript:
 lein do clean, cljsbuild auto test
 ```
 
-# Deploying
+## Deploying
 
 ```bash
 lein deploy clojars
