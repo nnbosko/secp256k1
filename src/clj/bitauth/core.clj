@@ -66,7 +66,7 @@
   "Get the SHA256 hash of a string"
   [s :- String]
   (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (.getBytes s "UTF-8"))
+      (.digest (.getBytes s "UTF-16BE"))
       array-to-hex))
 
 (schema/defn ^:private ripemd-160-hex :- Hex
