@@ -1,4 +1,4 @@
-(defproject bitauth "0.0.6"
+(defproject bitauth "0.1.0"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
@@ -9,14 +9,14 @@
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
   :java-source-paths ["src/java"]
   :dependencies [[base58 "0.1.0"]
-                 [cljsjs/bitauth "0.2.3-xcthulhu"]
+                 [cljsjs/bitauth "0.3.1-0"]
                  [com.madgag.spongycastle/core "1.52.0.0"]
                  [org.clojure/clojure "1.7.0"]
-                 [org.clojure/clojurescript "1.7.48"]
+                 [org.clojure/clojurescript "1.7.170"]
                  [prismatic/schema "1.0.1"]
                  [ring/ring-core "1.4.0"]]
   :hooks [leiningen.cljsbuild]
-  :plugins [[lein-cljsbuild "1.0.6"]
+  :plugins [[lein-cljsbuild "1.1.1"]
             [com.cemerick/clojurescript.test "0.3.3"]]
   :cljsbuild {:builds [{:id "test"
                         :source-paths ["src/cljs" "src/cljc" "test"]

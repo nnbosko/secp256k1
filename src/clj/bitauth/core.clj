@@ -66,7 +66,7 @@
   "Get the SHA256 hash of a string"
   [s :- String]
   (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (.getBytes s "UTF-16BE"))
+      (.digest (.getBytes s "UTF-8"))
       array-to-hex))
 
 (schema/defn ^:private ripemd-160-hex :- Hex
@@ -165,12 +165,14 @@
 (schema/defn validate-sin :- Boolean
   "Verify that a SIN is valid"
   [sin :- Base58]
-  (let [pub-with-checksum (-> sin base58/decode array-to-hex)
-        len (count pub-with-checksum)
-        expected-checksum (-> pub-with-checksum (subs (- len 8) len))
-        actual-checksum (-> pub-with-checksum
-                            (subs 0 (- len 8))
-                            hex-sha256
-                            hex-sha256
-                            (subs 0 8))]
-    (= expected-checksum actual-checksum)))
+  (try
+    (let [pub-with-checksum (-> sin base58/decode array-to-hex)
+          len (count pub-with-checksum)
+          expected-checksum (-> pub-with-checksum (subs (- len 8) len))
+          actual-checksum (-> pub-with-checksum
+                              (subs 0 (- len 8))
+                              hex-sha256
+                              hex-sha256
+                              (subs 0 8))]
+      (= expected-checksum actual-checksum))
+    (catch Exception _ false)))

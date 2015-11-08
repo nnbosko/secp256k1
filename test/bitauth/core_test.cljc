@@ -4,6 +4,7 @@
                     [schema.test]))
   #?(:cljs (:require
             [bitauth.core :as bitauth]
+            [cljsjs.bitauth]
             [schema.test]
             [cemerick.cljs.test
              :refer-macros [is deftest use-fixtures testing are]])))
@@ -81,39 +82,54 @@
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
       (are [x] (bitauth/verify-signature x pub-key (bitauth/sign x priv-key))
         "foo"
+
         "bar"
+
         "yabba dabba dooo"
+
         "I wanna hold 'em like they do in Texas, please
-            Fold 'em, let 'em, hit me, raise it, baby, stay with me (I love it)
-            Love game intuition play the cards with Spades to start
-            And after he's been hooked I'll play the one that's on his heart"
+         Fold 'em, let 'em, hit me, raise it, baby, stay with me (I love it)
+         Love game intuition play the cards with Spades to start
+         And after he's been hooked I'll play the one that's on his heart"
+
         "☕️   ⓝ  🀤  ⎈  ∲"
+
         "इसकी दो प्रजातियाँ हैं सुपर्ब लायर बर्ड तथा अलबर्ट्स लायर बर्ड"
+
         "금조류(琴鳥類, lyrebird)는 오스트레일리아 남부에 사는 참새목의 한 부류로, 주변의 소리를 잘 따라한다. 거문고새라고도 한다."
+
         "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。"
         )))
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
       (are [x y] (bitauth/verify-signature x pub-key y)
-        "foo"  "30450220451cce92b56350ea747ad5fcf848a9cbed97277825d8be13c0fcf8eaf4e015fa0221008ff5310557e301630c59373d84664d1dd4eaaddefb7a896c60f25365dfb28f82",
+        "foo"
+        "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
 
-        "baz" "304402202d6c14c8e0d9049aa9b0643c27c5b58c2aa75c318614d8344967a884e6a6370302201dd74af254a8eecaf5cb1dc9a16757b5fc4e0b1b6851f10035909fc0419c7779",
+        "baz"
+        "304502206ac2ffc240d23fd218a5aa9857065b8bb09ed6c154f1d7da2b56f993bd6e1e3e022100e8dba80dea09122ab87aae82f91e23876aa6628055e24afc895405482ac97aae",
 
-        "What a piece of work is a man! how noble in reason! how infinite in faculty! in form and moving how express and admirable! in action how like an angel! in apprehension how like a god!"
-        "3045022100a98d807592e2c77f3f4e16f45f540e9f83093db08ab0a61c35ad08f0a016ecea022067631d3ea1c646553bb4242835f7d54efcc0e7e84c1e61ab0f01be8b1104bbb4",
+        "What a piece of work is a man! how noble in reason! how infinite in faculty! in form and moving how express and admirable! in action how like an angel! in apprehension how like a god!",
+        "304402204c818a10380ba42b3be0a293d47922469c4ae7ad6277e0e62bf32700c79c32210220102b673477ee13877b4b7f8f9a2e4c2004553948fbe5e7fd95d7e23b4cd9f8e3",
 
         "☕️   ⓝ  🀤  ⎈  ∲"
-        "3045022100cfd45a68c1ed6b3f24514b024ba10906355305be8b3acba33ed92e420f8c307d022051cdea572b7869c2dfafd0fbfe7823c99a3c67621b6adeb856abe24d1575e199",
+        "304502204d78e57e9bce7fc6d3dd61bcd1baaceff2689f9a8efac5bbb8ce59a47f6652120221008bdce60d43916e35db9c8ee889ba2f85acd2a98fa0193cce0a7f9f9d9867aac1",
 
         "इसकी दो प्रजातियाँ हैं सुपर्ब लायर बर्ड तथा अलबर्ट्स लायर बर्ड"
-        "3045022079151babc06074279e3c322259e85c166409b5dbad04343573d596aa9da0c1d7022100b132eb81e92362772e6507d8cba7bd710c8764f9c6bf8b6852143c6bf77d0b45",
+        "304602210087d7aad4dc2789b8f58f97f541f95fc150ffc7fad8e09093932c023b13330e1a022100b434f9403048a983f8dfbd9b92ad8e2dac1ec4b1934dec8c94f4165bf981e01c",
 
         "금조류(琴鳥類, lyrebird)는 오스트레일리아 남부에 사는 참새목의 한 부류로, 주변의 소리를 잘 따라한다. 거문고새라고도 한다."
-        "304502202ce7e7ae440bde0bed0c647bdbcce501320109413b3d77dbcc117282264797640221008d0570f65598b234506a83f9958b80535f6cd87a664c2c7f6942ea90e736ffcc",
+        "3044022030e9acbd8f0f3328bd059296092824a38216a222d04ac7e1f3de89d4270f3e18022014386f61154177111fe1da0eee9874e612990d3ce663e6f2b4c44828b4c7072f",
 
-        "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。"
-        "304502203b287b4e720016aff0144a35b2c5d8738da939238b7481348a2744a8478740370221009e3349f5a99c84359f1cee315a8fb520c317b5ed139c302b82de52c8b358c778",
+        "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。",
+        "3046022100b286833ddce1537e12f56ae63fbbd6db25ac0dfab659d342a323b764765b60c0022100d83878b0529bf2cab70e98929faf11d1836d8452ef978aad558e35cce4fb14c4",
+
+        "ဂျူးလိယက်ဆီဇာ(ဘီစီ၁၀၀-၄၄)"
+        "304402206ba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
+
+        "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
+        "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
         ))))
 
 (deftest sin-tests
