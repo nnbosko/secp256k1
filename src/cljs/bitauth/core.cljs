@@ -31,13 +31,9 @@
 (schema/defn verify-signature :- schema/Bool
   "Verifies that a string of data has been signed."
   ([data :- schema/Str, pub-key :- Hex, hex-signature :- Hex]
-   (.verifySignature js/bitauth data pub-key hex-signature))
-  ([data :- schema/Str, pub-key :- Hex, hex-signature :- Hex, call-back]
-   (.verifySignature js/bitauth data pub-key hex-signature call-back)))
+   (.verifySignature js/bitauth data pub-key hex-signature)))
 
 (schema/defn validate-sin :- schema/Bool
   "Verify that a SIN is valid"
   ([sin :- Base58]
-   (.validateSin js/bitauth sin))
-  ([sin :- Base58, call-back]
-   (.validateSin js/bitauth sin call-back)))
+   (.validateSin js/bitauth sin)))
