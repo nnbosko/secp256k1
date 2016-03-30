@@ -22,6 +22,7 @@
                                   [http-kit "2.1.19"]
                                   [ring/ring-defaults "0.2.0"]]
                    :plugins [[lein-npm "0.6.2"]
+                             [lein-shell "0.5.0"]
                              [lein-cljsbuild "1.1.2"
                               :exclusions
                               [[org.apache.commons/commons-compress]
