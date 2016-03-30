@@ -1,13 +1,8 @@
 (ns bitauth.core-test
-  #?(:clj (:require [bitauth.core :as bitauth]
-                    [clojure.test :refer :all]
-                    [schema.test]))
-  #?(:cljs (:require
-            [bitauth.core :as bitauth]
-            [cljsjs.bitauth]
-            [schema.test]
-            [cemerick.cljs.test
-             :refer-macros [is deftest use-fixtures testing are]])))
+  (:require [bitauth.core :as bitauth]
+            #?(:clj  [clojure.test :refer :all])
+            #?(:cljs [cljs.test :refer-macros [is deftest use-fixtures testing are]])
+            [schema.test]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
