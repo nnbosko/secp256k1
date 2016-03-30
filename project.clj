@@ -10,17 +10,17 @@
   :repositories [["jitpack" "https://jitpack.io"]]
   :dependencies [[base58 "0.1.0"]
                  [com.github.xcthulhu/bitauth-cljs "0.3.2-0"]
-                 [com.madgag.spongycastle/core "1.52.0.0"]
+                 [com.madgag.spongycastle/core "1.54.0.0"]
                  [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.8.34"]
-                 [prismatic/schema "1.0.1"]
+                 [org.clojure/clojurescript "1.8.40"]
+                 [prismatic/schema "1.1.0"]
                  [ring/ring-core "1.4.0"]]
 
   :profiles {:uberjar {:aot :all}
              :dev {:test-paths ["test"]
-                   :dependencies [[compojure "1.4.0"]
+                   :dependencies [[compojure "1.5.0"]
                                   [http-kit "2.1.19"]
-                                  [ring/ring-defaults "0.1.5"]]
+                                  [ring/ring-defaults "0.2.0"]]
                    :plugins [[lein-npm "0.6.2"]
                              [lein-cljsbuild "1.1.2"
                               :exclusions
@@ -46,10 +46,9 @@
                                 {:id           "test-advanced"
                                  :source-paths ["src/cljs" "src/cljc" "test"]
                                  :compiler     {:output-to     "target/js/compiled/testable.min.js"
-                                                :main          "chromatophore.doo.runner"
+                                                :main          "bitauth.test-runner"
                                                 :optimizations :advanced
-                                                :pretty-print  false}}]
-                               }}}
+                                                :pretty-print  false}}]}}}
   :scm            {:name "git"
                    :url "https://github.com/Sepia-Officinalis/clj-bitauth.git"}
   :pom-addition [:developers [:developer
@@ -57,11 +56,11 @@
                               [:name "Matthew Wampler-Doty"]]]
   :target-path  "target"
   :aliases      {"test-advanced"       ["do"
-                                        ;;"clean,"
-                                        ;;"npm" "install,"
-                                        ;;"test,"
-                                        "doo" "phantom" "test" "once,"
-                                        ;;"doo" "all" "test-advanced" "once,"
+                                        "clean,"
+                                        "npm" "install,"
+                                        "test,"
+                                        "doo" "all" "test" "once,"
+                                        ;;"doo" "phantom" "test-advanced" "once,"
                                         ]
                  "advanced-test"       ["test-advanced"]
                  "deep-clean"          ["do"
