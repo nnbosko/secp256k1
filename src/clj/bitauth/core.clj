@@ -33,27 +33,44 @@
                          (.getN params)
                          (.getH params))))
 
+(defn- strip-0x
+  "Gets rid of the leading `0x` identifier of hex strings"
+  [s]
+  (if (.startsWith (.toLowerCase s) "0x") (.substring s 2) s))
+
+(defn- add-leading-zero-if-necessary
+  "Adds a leading zero to a hex string if it is of odd length"
+  [s]
+  (if (odd? (count s)) (str "0" s) s))
+
+(defn- hex-char-to-byte
+  "Convert a single hexdecimal character to a byte"
+  [c]
+  (-> c (Character/digit 16) byte))
+
 (schema/defn ^:private hex-to-array
   "Convert a string to a byte array, discarding leading zeros as necessary"
   [s :- Hex]
-  (let [a (-> s (BigInteger. 16) .toByteArray)]
-    (if (and (-> (count a) (> 32))
-             ;; TODO: This is a clumsy way of getting rid of zeros,
-             ;; there should be a flag or something
-             (every? zero? (Arrays/copyOfRange a 0 (- (count a) 32))))
-      (Arrays/copyOfRange a (- (count a) 32) (count a))
-      a)))
+  (->> s
+       strip-0x
+       add-leading-zero-if-necessary
+       (partition 2)
+       (map
+         (fn [[a b]]
+           (+ (bit-shift-left (hex-char-to-byte a) 4)
+              (hex-char-to-byte b))))
+       byte-array))
+
+(def ^:private hex-chars-string "0123456789abcdef")
 
 (schema/defn ^:private array-to-hex :- Hex
   "Encode an collection of bytes as hex"
   [b]
-  (let [chars "0123456789abcdef"]
-    (-> (for [x b :let [v (bit-and x 0xFF)]]
-          [(get chars (bit-shift-right v 4))
-           (get chars (bit-and v 0x0F))])
-        flatten
-        char-array
-        String.)))
+  (apply str (for [x    b
+                   :let [v (bit-and x 0xFF)]
+                   y    [(get hex-chars-string (bit-shift-right v 4))
+                         (get hex-chars-string (bit-and v 0x0F))]]
+               y)))
 
 (schema/defn ^:private hex-sha256 :- Hex
   "Get the SHA256 hash of a hex string"
@@ -107,7 +124,7 @@
         pub-prefixed (str "0f02" (ripemd-160-hex pub-hash))
         checksum (-> pub-prefixed hex-sha256 hex-sha256 (subs 0 8))]
     (int-to-base58
-     (BigInteger. (str pub-prefixed checksum) 16) 0)))
+      (BigInteger. (str pub-prefixed checksum) 16) 0)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -131,9 +148,9 @@
                             (BigInteger. 16)
                             (ECPrivateKeyParameters. curve))
         sigs (->
-              (ECDSASigner.)
-              (doto (.init true spongy-priv-key))
-              (.generateSignature input))
+               (ECDSASigner.)
+               (doto (.init true spongy-priv-key))
+               (.generateSignature input))
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
       (doto s
