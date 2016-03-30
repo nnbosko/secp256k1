@@ -5,7 +5,7 @@
   http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
 
   (:require [bitauth.schema :refer [Hex Base58]]
-            [cljsjs.bitauth]
+            [com.bitpay.BitAuth]
             [schema.core :as schema :include-macros true]))
 
 (schema/defn get-public-key-from-private-key :- Hex
