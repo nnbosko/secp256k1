@@ -1,16 +1,16 @@
 (ns bitauth.core-test
   (:require [bitauth.core :as bitauth]
             #?(:clj  [clojure.test :refer :all])
-            #?(:cljs [cljs.test :refer-macros [is deftest use-fixtures testing are]])
+            #?(:cljs [cljs.test :refer-macros [is use-fixtures testing are]])
+            #?(:cljs [devcards.core :refer-macros [deftest]])
             [schema.test]))
 
 (use-fixtures :once schema.test/validate-schemas)
 
 (deftest get-public-key-from-private-key-with-leading-zero
-  (is (= \0
-         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
-             bitauth/get-public-key-from-private-key
-             first))
+  (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+         (bitauth/get-public-key-from-private-key
+          "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
       "Public key should start with a leading zero"))
 
 (deftest known-results-tests
@@ -59,8 +59,8 @@
    (deftest x962-point-encode-decode
      (testing "x962-point-encode is the left inverse of x962-point-decode"
        (letfn [(encode-decode [x]
-                              (#'bitauth/x962-point-encode
-                               (#'bitauth/x962-point-decode x)))]
+                 (#'bitauth/x962-point-encode
+                  (#'bitauth/x962-point-decode x)))]
          (are [y] (= y (encode-decode y))
            "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
            "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
@@ -93,8 +93,8 @@
 
         "금조류(琴鳥類, lyrebird)는 오스트레일리아 남부에 사는 참새목의 한 부류로, 주변의 소리를 잘 따라한다. 거문고새라고도 한다."
 
-        "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。"
-        )))
+        "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。")))
+
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
@@ -124,8 +124,8 @@
         "304402206ba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
 
         "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
-        "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
-        ))))
+        "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",))))
+
 
 (deftest sin-tests
   (testing "Reference sins are valid"

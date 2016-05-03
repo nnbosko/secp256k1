@@ -56,9 +56,9 @@
        add-leading-zero-if-necessary
        (partition 2)
        (map
-         (fn [[a b]]
-           (+ (bit-shift-left (hex-char-to-byte a) 4)
-              (hex-char-to-byte b))))
+        (fn [[a b]]
+          (+ (bit-shift-left (hex-char-to-byte a) 4)
+             (hex-char-to-byte b))))
        byte-array))
 
 (def ^:private hex-chars-string "0123456789abcdef")
@@ -95,10 +95,17 @@
     (.doFinal d o 0)
     (array-to-hex o)))
 
+(schema/defn ^:private zero-pad-left :- Hex
+  "Pad a hex string with zeros on the left until it is the specified length"
+  [s :- Hex, n :- schema/Int]
+  (if (< (count s) n)
+    (apply str (concat (repeat (- n (count s)) \0) s))
+    s))
+
 (schema/defn ^:private x962-point-encode :- Hex
   "Encode a public key as hex using X9.62 compression"
   [pub-key]
-  (let [x (-> pub-key .getX .toBigInteger (.toString 16))
+  (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
         y-even? (-> pub-key .getY .toBigInteger even?)]
     (str (if y-even? "02" "03") x)))
 
@@ -124,7 +131,7 @@
         pub-prefixed (str "0f02" (ripemd-160-hex pub-hash))
         checksum (-> pub-prefixed hex-sha256 hex-sha256 (subs 0 8))]
     (int-to-base58
-      (BigInteger. (str pub-prefixed checksum) 16) 0)))
+     (BigInteger. (str pub-prefixed checksum) 16) 0)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -148,9 +155,9 @@
                             (BigInteger. 16)
                             (ECPrivateKeyParameters. curve))
         sigs (->
-               (ECDSASigner.)
-               (doto (.init true spongy-priv-key))
-               (.generateSignature input))
+              (ECDSASigner.)
+              (doto (.init true spongy-priv-key))
+              (.generateSignature input))
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
       (doto s
