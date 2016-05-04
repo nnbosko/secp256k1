@@ -4,8 +4,7 @@
   https://github.com/bitpay/bitauth
   http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
 
-  (:require [base58.core :refer [int-to-base58] :as base58]
-            [bitauth.schema :refer [Hex Base58]]
+  (:require [bitauth.schema :refer [Hex Base58]]
             [schema.core :as schema])
   (:import java.io.ByteArrayOutputStream
            java.security.MessageDigest
@@ -61,7 +60,7 @@
              (hex-char-to-byte b))))
        byte-array))
 
-(def ^:private hex-chars-string "0123456789abcdef")
+(defonce ^:private ^:const hex-chars-string "0123456789abcdef")
 
 (schema/defn ^:private array-to-hex :- Hex
   "Encode an collection of bytes as hex"
@@ -72,28 +71,19 @@
                          (get hex-chars-string (bit-and v 0x0F))]]
                y)))
 
-(schema/defn ^:private hex-sha256 :- Hex
-  "Get the SHA256 hash of a hex string"
-  [s :- Hex]
+(defn- sha256
+  "Get the SHA256 hash of a byte-array"
+  [data]
   (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (hex-to-array s))
-      array-to-hex))
+      (.digest data)))
 
-(schema/defn ^:private sha256 :- Hex
-  "Get the SHA256 hash of a string"
-  [s :- String]
-  (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (.getBytes s "UTF-8"))
-      array-to-hex))
-
-(schema/defn ^:private ripemd-160-hex :- Hex
-  "Get the ripemd-160-hex hash of a hex string"
-  [s :- Hex]
-  (let [a (hex-to-array s)
-        d (doto (RIPEMD160Digest.) (.update a 0 (count a)))
+(defn- ripemd-160
+  "Get the ripemd-160 hash of a hex string"
+  [a]
+  (let [d (doto (RIPEMD160Digest.) (.update a 0 (count a)))
         o (byte-array (.getDigestSize d))]
     (.doFinal d o 0)
-    (array-to-hex o)))
+    o))
 
 (schema/defn ^:private zero-pad-left :- Hex
   "Pad a hex string with zeros on the left until it is the specified length"
@@ -124,14 +114,40 @@
       (.multiply (BigInteger. priv-key 16))
       x962-point-encode))
 
+(defonce ^:private ^:const fifty-eight-chars-string
+  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+
+(schema/defn bigint-to-base58 :- Base58
+  "Encodes an integer into a base58 string."
+  ([input]
+   (bigint-to-base58 input 0))
+  ([input leading-zeros]
+   (loop [acc [], n input]
+     (if (pos? n)
+       (let [i (rem n 58)
+             s (nth fifty-eight-chars-string i)]
+         (recur (cons s acc) (quot n 58)))
+       (apply str (concat
+                   (repeat leading-zeros (first fifty-eight-chars-string))
+                   acc))))))
+
 (schema/defn get-sin-from-public-key :- Base58
   "Generate a SIN from a compressed public key"
   [pub-key :- Hex]
-  (let [pub-hash (hex-sha256 pub-key)
-        pub-prefixed (str "0f02" (ripemd-160-hex pub-hash))
-        checksum (-> pub-prefixed hex-sha256 hex-sha256 (subs 0 8))]
-    (int-to-base58
-     (BigInteger. (str pub-prefixed checksum) 16) 0)))
+  (let [pub-prefixed (->> pub-key
+                          hex-to-array
+                          sha256
+                          ripemd-160
+                          array-to-hex
+                          (str "0f02"))
+        checksum     (-> pub-prefixed
+                         hex-to-array
+                         sha256
+                         sha256
+                         array-to-hex
+                         (subs 0 8))]
+    (bigint-to-base58
+     (BigInteger. (str pub-prefixed checksum) 16))))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -140,7 +156,7 @@
         (-> (ECKeyPairGenerator.)
             (doto (.init (ECKeyGenerationParameters. curve (SecureRandom.))))
             .generateKeyPair)
-        priv (-> key-pair .getPrivate .getD (.toString 16))
+        priv (-> key-pair .getPrivate .getD (.toString 16) (zero-pad-left 64))
         pub (get-public-key-from-private-key priv)]
     {:created (-> (System/currentTimeMillis) (/ 1000)),
      :priv priv,
@@ -150,7 +166,7 @@
 (schema/defn sign :- Hex
   "Sign some data with a private-key"
   [data :- String, priv-key :- Hex]
-  (let [input (-> data sha256 hex-to-array)
+  (let [input (-> data (.getBytes "UTF-8") sha256)
         spongy-priv-key (-> priv-key
                             (BigInteger. 16)
                             (ECPrivateKeyParameters. curve))
@@ -183,20 +199,44 @@
   "Verifies that a string of data has been signed."
   [data :- String, pub-key :- Hex, hex-signature :- Hex]
   (try
-    (verify (-> data sha256 hex-to-array) pub-key hex-signature)
+    (verify (-> data (.getBytes "UTF-8") sha256) pub-key hex-signature)
     (catch Exception _ false)))
+
+(schema/defn ^:private
+  base58-decode
+  "Decodes a base58-encoded string into a byte array.
+   Returns nil if the string contains invalid base58 characters."
+  [s :- Base58]
+  (when (clojure.set/subset? (set s) (set fifty-eight-chars-string))
+    (let [padding (->> s
+                       (take-while #(= % (first fifty-eight-chars-string)))
+                       (map (fn [x] (byte 0))))]
+      (loop [result 0, s s]
+        (if-not (empty? s)
+          (recur (+ (*' result 58)
+                    (.indexOf fifty-eight-chars-string (str (first s))))
+                 (rest s))
+          (->> result
+               str
+               java.math.BigInteger.
+               .toByteArray
+               (drop-while zero?)
+               (concat padding)
+               byte-array))))))
 
 (schema/defn validate-sin :- Boolean
   "Verify that a SIN is valid"
   [sin :- Base58]
   (try
-    (let [pub-with-checksum (-> sin base58/decode array-to-hex)
-          len (count pub-with-checksum)
+    (let [pub-with-checksum (-> sin base58-decode array-to-hex)
+          len               (count pub-with-checksum)
           expected-checksum (-> pub-with-checksum (subs (- len 8) len))
-          actual-checksum (-> pub-with-checksum
-                              (subs 0 (- len 8))
-                              hex-sha256
-                              hex-sha256
-                              (subs 0 8))]
+          actual-checksum   (-> pub-with-checksum
+                                (subs 0 (- len 8))
+                                hex-to-array
+                                sha256
+                                sha256
+                                array-to-hex
+                                (subs 0 8))]
       (= expected-checksum actual-checksum))
     (catch Exception _ false)))
