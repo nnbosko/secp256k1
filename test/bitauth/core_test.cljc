@@ -55,6 +55,7 @@
                              (#'bitauth/hex-to-array)
                              (#'bitauth/array-to-hex)))))))
 
+;; TODO: test cljs
 #?(:clj
    (deftest x962-point-encode-decode
      (testing "x962-point-encode is the left inverse of x962-point-decode"
@@ -75,7 +76,7 @@
   (testing "Signed messages can be checked with a proper pub key"
     (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
-      (are [x] (bitauth/verify-signature x pub-key (bitauth/sign x priv-key))
+      (are [x] (bitauth/verify-signature pub-key x (bitauth/sign priv-key x))
         "foo"
 
         "bar"
@@ -98,7 +99,7 @@
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
           pub-key (bitauth/get-public-key-from-private-key priv-key)]
-      (are [x y] (bitauth/verify-signature x pub-key y)
+      (are [x y] (bitauth/verify-signature pub-key x y)
         "foo"
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
 
@@ -124,7 +125,39 @@
         "304402206ba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
 
         "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
-        "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",))))
+        "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c")))
+
+  (testing "Bad signatures"
+    (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+          pub-key (bitauth/get-public-key-from-private-key priv-key)]
+      (are [x y] (not (bitauth/verify-signature pub-key x y))
+        5
+        "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
+
+        "baz"
+        "XXX304502206ac2ffc240d23fd218a5aa9857065b8bb09ed6c154f1d7da2b56f993bd6e1e3e022100e8dba80dea09122ab87aae82f91e23876aa6628055e24afc895405482ac97aae",
+
+        "What a piece of work is a man! how noble in reason! how infinite in faculty! in form and moving how express and admirable! in action how like an angel! in apprehension how like a god!",
+        :foo,
+
+        nil
+        "304502204d78e57f2689f9a8efac5bbb8ce59a47f6652120221008bdce60d43916e35db9c8ee889ba2f85acd2a98fa0193cce0a7f9f9d9867aac1",
+
+        (constantly :foo)
+        "304602210087d7aad4dc2789b8f58f97f541f95fc150ffc7fad8e09093932c023b13330e1a022100b434f9403048a983f8dfbd9b92ad8e2dac1ec4b1934dec8c94f4165bf981e01c",
+
+        "금조류(琴鳥類, lyrebird)는 오스트레일리아 남부에 사는 참새목의 한 부류로, 주변의 소리를 잘 따라한다. 거문고새라고도 한다."
+        "I should fail",
+
+        "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。"
+        7,
+
+        "ဂျူးလိယက်ဆီဇာ(ဘီစီ၁၀၀-၄၄)"
+        "304402206བང་འབངས་མི་ཞིག་ལ་མba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
+
+       ;; "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
+       ;; "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
+        ))))
 
 
 (deftest sin-tests
@@ -136,7 +169,22 @@
       "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
       "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
       "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
-      "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X")))
+      "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))
+
+  (testing "Ill-formatted sins are invalid"
+    (are [x] (not (bitauth/validate-sin x))
+      7
+      (constantly :foo)
+      :bar
+      ""
+      "\"\""
+      "/TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
+      "TfGVzWqwft6fFdLzyvR7qFTT77N7aTqa4n"
+      "Tf4Lo9zAezP7LKc3njaK5pez7oVhzH2H"
+      "%Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
+      "&TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
+      "TfBZ3DacgxVbem&&ggEXZtHxoNXgD5FWi2cLD"
+      "1111TfFc5NFFY6EsGcY6xe6vSct2hCWzk25X")))
 
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
@@ -146,7 +194,7 @@
                      bitauth/get-public-key-from-private-key
                      bitauth/get-sin-from-public-key)))
       (is (bitauth/validate-sin sin))
-      (are [x] (bitauth/verify-signature x pub (bitauth/sign x priv))
+      (are [x] (bitauth/verify-signature pub x (bitauth/sign priv x))
         "trololololol"
         "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
         "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"

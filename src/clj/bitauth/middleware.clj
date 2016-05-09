@@ -14,7 +14,7 @@
           body (when (request :body) (slurp (request :body)))
           full-url (str (-> request :scheme name) "://" host (request :uri))
           data (str full-url body)]
-      (if (bitauth/verify-signature data x-identity x-signature)
+      (if (bitauth/verify-signature x-identity data x-signature)
         (-> request
             (assoc :body (when body (-> body .getBytes ByteArrayInputStream.)))
             (assoc :sin (bitauth/get-sin-from-public-key x-identity))

@@ -4,8 +4,9 @@
   https://github.com/bitpay/bitauth
   http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
 
-  (:require [bitauth.schema :refer [Hex Base58]]
-            [schema.core :as schema])
+  (:require [bitauth.schema :refer [Hex Base58 hex?]]
+            [schema.core :as schema]
+            [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.MessageDigest
            java.security.SecureRandom
@@ -63,7 +64,7 @@
 (defonce ^:private ^:const hex-chars-string "0123456789abcdef")
 
 (schema/defn ^:private array-to-hex :- Hex
-  "Encode an collection of bytes as hex"
+  "Encode a collection of bytes as hex"
   [b]
   (apply str (for [x    b
                    :let [v (bit-and x 0xFF)]
@@ -117,19 +118,19 @@
 (defonce ^:private ^:const fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
-(schema/defn bigint-to-base58 :- Base58
-  "Encodes an integer into a base58 string."
-  ([input]
-   (bigint-to-base58 input 0))
-  ([input leading-zeros]
-   (loop [acc [], n input]
-     (if (pos? n)
-       (let [i (rem n 58)
-             s (nth fifty-eight-chars-string i)]
-         (recur (cons s acc) (quot n 58)))
-       (apply str (concat
-                   (repeat leading-zeros (first fifty-eight-chars-string))
-                   acc))))))
+(schema/defn ^:private
+  hex-to-base58 :- Base58
+  "Encodes a hex-string as a base58-string"
+  [input :- Hex]
+  (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
+    (loop [acc [], n (BigInteger. input 16)]
+      (if (pos? n)
+        (let [i (rem n 58)
+              s (nth fifty-eight-chars-string i)]
+          (recur (cons s acc) (quot n 58)))
+        (apply str (concat
+                    (repeat leading-zeros (first fifty-eight-chars-string))
+                    acc))))))
 
 (schema/defn get-sin-from-public-key :- Base58
   "Generate a SIN from a compressed public key"
@@ -146,34 +147,33 @@
                          sha256
                          array-to-hex
                          (subs 0 8))]
-    (bigint-to-base58
-     (BigInteger. (str pub-prefixed checksum) 16))))
+    (-> (str pub-prefixed checksum)
+        hex-to-base58)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
   []
-  (let [key-pair
+  (let [priv-key
         (-> (ECKeyPairGenerator.)
             (doto (.init (ECKeyGenerationParameters. curve (SecureRandom.))))
-            .generateKeyPair)
-        priv (-> key-pair .getPrivate .getD (.toString 16) (zero-pad-left 64))
-        pub (get-public-key-from-private-key priv)]
-    {:created (-> (System/currentTimeMillis) (/ 1000)),
-     :priv priv,
-     :pub pub,
-     :sin (get-sin-from-public-key pub)}))
+            .generateKeyPair
+            .getPrivate .getD (.toString 16) (zero-pad-left 64))
+        pub-key (get-public-key-from-private-key priv-key)]
+    {:created (System/currentTimeMillis),
+     :priv priv-key,
+     :pub pub-key,
+     :sin (get-sin-from-public-key pub-key)}))
 
 (schema/defn sign :- Hex
   "Sign some data with a private-key"
-  [data :- String, priv-key :- Hex]
+  [priv-key :- Hex, data :- String]
   (let [input (-> data (.getBytes "UTF-8") sha256)
         spongy-priv-key (-> priv-key
                             (BigInteger. 16)
                             (ECPrivateKeyParameters. curve))
-        sigs (->
-              (ECDSASigner.)
-              (doto (.init true spongy-priv-key))
-              (.generateSignature input))
+        sigs (-> (ECDSASigner.)
+                 (doto (.init true spongy-priv-key))
+                 (.generateSignature input))
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
       (doto s
@@ -183,7 +183,7 @@
 
 (schema/defn ^:private verify :- Boolean
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
-  [input, pub-key :- Hex, hex-signature :- Hex]
+  [pub-key :- Hex, input, hex-signature :- Hex]
   (let [spongy-pub-key (-> pub-key
                            x962-point-decode
                            (ECPublicKeyParameters. curve))
@@ -196,47 +196,55 @@
         (.verifySignature verifier input r s)))))
 
 (schema/defn verify-signature :- Boolean
-  "Verifies that a string of data has been signed."
-  [data :- String, pub-key :- Hex, hex-signature :- Hex]
-  (try
-    (verify (-> data (.getBytes "UTF-8") sha256) pub-key hex-signature)
-    (catch Exception _ false)))
+  "Verifies that a string of data has been signed"
+  [pub-key data hex-signature]
+  (and
+   (string? data)
+   (hex? pub-key)
+   (hex? hex-signature)
+   (try
+     (verify pub-key  (-> data (.getBytes "UTF-8") sha256) hex-signature)
+     (catch Exception _ false))))
 
 (schema/defn ^:private
-  base58-decode
-  "Decodes a base58-encoded string into a byte array.
-   Returns nil if the string contains invalid base58 characters."
+  base58-to-hex :- Hex
+  "Encodes a base58-string as a hex-string"
   [s :- Base58]
-  (when (clojure.set/subset? (set s) (set fifty-eight-chars-string))
-    (let [padding (->> s
-                       (take-while #(= % (first fifty-eight-chars-string)))
-                       (map (fn [x] (byte 0))))]
-      (loop [result 0, s s]
-        (if-not (empty? s)
-          (recur (+ (*' result 58)
-                    (.indexOf fifty-eight-chars-string (str (first s))))
-                 (rest s))
-          (->> result
-               str
-               java.math.BigInteger.
-               .toByteArray
-               (drop-while zero?)
-               (concat padding)
-               byte-array))))))
+  (let [padding (->> s
+                     (take-while #(= % (first fifty-eight-chars-string)))
+                     (map (constantly (byte 0))))]
+    (loop [result 0, s s]
+      (if-not (empty? s)
+        (recur (+ (*' result 58)
+                  (.indexOf fifty-eight-chars-string (str (first s))))
+               (rest s))
+        (->> result
+             str
+             java.math.BigInteger.
+             .toByteArray
+             (drop-while zero?)
+             (concat padding)
+             byte-array
+             array-to-hex)))))
 
-(schema/defn validate-sin :- Boolean
+(schema/defn validate-sin :- schema/Bool
   "Verify that a SIN is valid"
-  [sin :- Base58]
+  [sin]
   (try
-    (let [pub-with-checksum (-> sin base58-decode array-to-hex)
-          len               (count pub-with-checksum)
-          expected-checksum (-> pub-with-checksum (subs (- len 8) len))
-          actual-checksum   (-> pub-with-checksum
-                                (subs 0 (- len 8))
-                                hex-to-array
-                                sha256
-                                sha256
-                                array-to-hex
-                                (subs 0 8))]
-      (= expected-checksum actual-checksum))
+    (and (string? sin)
+         (clojure.set/subset? (set sin) (set fifty-eight-chars-string))
+         (let [pub-with-checksum (base58-to-hex sin)
+               len               (count pub-with-checksum)
+               expected-checksum (-> pub-with-checksum (subs (- len 8) len))
+               actual-checksum   (-> pub-with-checksum
+                                     (subs 0 (- len 8))
+                                     hex-to-array
+                                     sha256
+                                     sha256
+                                     array-to-hex
+                                     (subs 0 8))]
+           (and (clojure.string/starts-with? pub-with-checksum "0f02")
+                (= expected-checksum actual-checksum))))
     (catch Exception _ false)))
+
+(comment (run-tests))

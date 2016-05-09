@@ -35,7 +35,7 @@
     (let [{:keys [:priv :pub]} (bitauth/generate-sin)
           url (str "http://0.0.0.0:" port "/")
           options {:headers {"x-identity" pub
-                             "x-signature" (bitauth/sign url priv)}}
+                             "x-signature" (bitauth/sign priv url)}}
           {:keys [:status :body] :as resp} @(http/get url options)]
       (is (= "It is dangerous to go alone! Take this!" body))
       (is (= 200 status)))))
@@ -52,7 +52,7 @@
           url (str "http://0.0.0.0:" port "/echo")
           data "foo"
           options {:headers {"x-identity" pub
-                             "x-signature" (bitauth/sign (str url data) priv)}
+                             "x-signature" (bitauth/sign priv (str url data))}
                    :body data}
           {:keys [:status :body] :as resp} @(http/post url options)]
       (is (= "foo" body))
@@ -63,7 +63,7 @@
     (let [{:keys [:priv :pub :sin]} (bitauth/generate-sin)
           url (str "http://0.0.0.0:" port "/sin")
           options {:headers {"x-identity" pub
-                             "x-signature" (bitauth/sign url priv)}}
+                             "x-signature" (bitauth/sign priv url)}}
           {:keys [:status :body] :as resp} @(http/get url options)]
       (is (= sin body))
       (is (= 200 status)))))

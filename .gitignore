@@ -20,3 +20,6 @@ pom.xml.asc
 /.idea/
 bitauth.iml
 /out
+/dev-resources/public/js/compiled/*
+figwheel_server.log
+.\#*
