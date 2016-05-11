@@ -6,6 +6,7 @@
 
   (:require [bitauth.schema :refer [Hex Base58 hex?]]
             [schema.core :as schema]
+            [clojure.string :refer [starts-with?]]
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.MessageDigest
@@ -36,7 +37,7 @@
 (defn- strip-0x
   "Gets rid of the leading `0x` identifier of hex strings"
   [s]
-  (if (.startsWith (.toLowerCase s) "0x") (.substring s 2) s))
+  (if (starts-with? (.toLowerCase s) "0x") (.substring s 2) s))
 
 (defn- add-leading-zero-if-necessary
   "Adds a leading zero to a hex string if it is of odd length"
@@ -93,19 +94,63 @@
     (apply str (concat (repeat (- n (count s)) \0) s))
     s))
 
-(schema/defn ^:private x962-point-encode :- Hex
-  "Encode a public key as hex using X9.62 compression"
-  [pub-key]
-  (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
-        y-even? (-> pub-key .getY .toBigInteger even?)]
-    (str (if y-even? "02" "03") x)))
+(declare x962-point-encode)
+(declare x962-point-decode)
 
-(schema/defn ^:private x962-point-decode
+(defn x962-point-encode
+  "Encode a public key as hex using X9.62 compression"
+  [pub-key & {:keys [:compressed]
+              :or {:compressed true}}]
+  (cond
+    (instance? org.spongycastle.math.ec.ECPoint$Fp pub-key)
+    (if compressed
+      (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
+            y-even? (-> pub-key .getY .toBigInteger even?)]
+        (str (if y-even? "02" "03") x))
+      (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
+            y (-> pub-key .getY .toBigInteger (.toString 16) (zero-pad-left 64))]
+        (str "04" x y)))
+
+    (and
+     (hex? pub-key)
+     (#{"02" "03"} (subs pub-key 0 2)))
+    (let [pt (x962-point-decode pub-key)]
+      (assert (= (x962-point-encode pt) pub-key), "Invalid point")
+      (if compressed
+        pub-key
+        (x962-point-encode pt :compressed false)))
+
+    (and
+     (hex? pub-key)
+     (= "04" (subs pub-key 0 2)))
+    (let [pt (x962-point-decode pub-key)]
+      (assert (= (x962-point-encode pt :compressed false) pub-key),
+              "Invalid point")
+      (if-not compressed
+        pub-key
+        (x962-point-encode pt)))
+
+    :else
+    (throw (ex-info "Cannot encode argument"
+                    {:argument pub-key
+                     :compressed compressed}))))
+
+(defn x962-point-decode
   "Decode a public key using X9.62 compression"
-  [encoded-key :- Hex]
-  (->> encoded-key
-       hex-to-array
-       (.decodePoint (.getCurve curve))))
+  [encoded-key]
+  (cond
+    (instance? org.spongycastle.math.ec.ECPoint$Fp encoded-key)
+    (let [hex-key (x962-point-encode encoded-key :compressed false)]
+      (assert (= (x962-point-decode hex-key) encoded-key), "Invalid point")
+      encoded-key)
+
+    (hex? encoded-key)
+    (->> encoded-key
+         hex-to-array
+         (.decodePoint (.getCurve curve)))
+
+    :else
+    (throw (ex-info "Cannot decode argument" {:argument encoded-key}))))
 
 (schema/defn get-public-key-from-private-key :- Hex
   "Generate a public key from a private key"

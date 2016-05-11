@@ -56,21 +56,56 @@
                              (#'bitauth/array-to-hex)))))))
 
 ;; TODO: test cljs
-#?(:clj
-   (deftest x962-point-encode-decode
-     (testing "x962-point-encode is the left inverse of x962-point-decode"
-       (letfn [(encode-decode [x]
-                 (#'bitauth/x962-point-encode
-                  (#'bitauth/x962-point-decode x)))]
-         (are [y] (= y (encode-decode y))
-           "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
-           "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
-           "03816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846"
-           "0233bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd1"
-           "02e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e"
-           "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
-           "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
-           "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))))
+(deftest x962-point-encode-decode
+  (testing "x962-point-encode is the left inverse of x962-point-decode"
+    (letfn [(encode-decode [x]
+              (bitauth/x962-point-encode
+               (bitauth/x962-point-decode x)))]
+      (are [y] (= y (encode-decode y))
+        "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
+        "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
+        "03816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846"
+        "0233bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd1"
+        "02e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e"
+        "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
+        "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
+        "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))
+
+  (testing "x962-point-encode is the left inverse of x962-point-decode (uncompressed)"
+    (letfn [(encode-decode [x]
+              (-> x
+                  bitauth/x962-point-decode
+                  (bitauth/x962-point-encode :compressed false)
+                  (bitauth/x962-point-encode :compressed false)
+                  bitauth/x962-point-decode
+                  bitauth/x962-point-encode
+                  (bitauth/x962-point-encode :compressed false)
+                  bitauth/x962-point-encode
+                  (bitauth/x962-point-encode :compressed false)))]
+      (are [y] (= y (encode-decode y))
+        "04256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1ca81c29a7307b6c77182b77ce9699b6b2940610b2306825fd38a475dd3c804c4"
+        "0433952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58a002d2f3b46b55c54d1780c176119497cb81b0ace382227f2a6b8b3ba1eccd83"
+        "04816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846eea75ae3bd6a053582d362a054129567ff2e0c4877e7b2a4d958913121b099f7"
+        "0433bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd11880422a1640df75f9601927e09b6c053e0aef740f52fc4b341e750891294210"
+        "04e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e02cd25f31fd29119c7259840b97855156f3a9ac52f7ae0cb69c22695e649d2fc"
+        "04fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c07532c7c1481771989377bb0a7820c554c272fd77cdf2dac55f3aa1eca82eaf5"
+        "043502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9dd3c65e83963adac704e5782b5f886280a8c4960f1e49152b139bfd05862c7af"
+        "0487efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5aa43aaed73348f97b306145ce0544078210f7e587c675805ccc0933d6673c979")))
+
+  (testing "x962-point-encoding twice is idempotent"
+    (letfn [(encode-decode [x]
+              (bitauth/x962-point-encode
+               (bitauth/x962-point-encode
+                (bitauth/x962-point-decode x))))]
+      (are [y] (= y (encode-decode y))
+        "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
+        "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
+        "03816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846"
+        "0233bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd1"
+        "02e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e"
+        "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
+        "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
+        "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5"))))
 
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
@@ -155,8 +190,8 @@
         "ဂျူးလိယက်ဆီဇာ(ဘီစီ၁၀၀-၄၄)"
         "304402206བང་འབངས་མི་ཞིག་ལ་མba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
 
-       ;; "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
-       ;; "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
+        "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
+        "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
         ))))
 
 

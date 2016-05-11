@@ -10,6 +10,7 @@
             [bitauth.formatting :refer [add-leading-zero-if-necessary
                                         DER-encode-ECDSA-signature
                                         DER-decode-ECDSA-signature]]
+            [bitauth.math :refer [modular-square-root even?]]
             [schema.core :as schema :include-macros true]
             [goog.array :refer [toArray]]
             [goog.crypt]
@@ -20,13 +21,11 @@
 
 (defonce
   ^:private
-  ^:const
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve js/sjcl.ecc.curves.k256)
 
 (defonce
   ^:private
-  ^:const
   ^{:doc "The modulus of the secp256k1 curve"}
   curve-modulus
   (new js/sjcl.bn
@@ -34,81 +33,12 @@
 
 ;;; UTILITY FUNCTIONS
 
-(defn- even?
+#_(defn- even?
   "Patch the usual cljs.core/even? to work for sjcl.bn instances"
   [n]
   (if (instance? js/sjcl.bn n)
     (.equals (.mod n 2) 0)
     (cljs.core/even? n)))
-
-(defn- modular-square-root
-  "Compute the square root of a number modulo a prime"
-  [n modulus]
-
-  (let [modulus (new js/sjcl.bn modulus)
-        n       (.mod (new js/sjcl.bn n) modulus)
-        mod8    (-> modulus (.mod 8) .toString js/parseInt)]
-    (assert (.greaterEquals n 2),
-            "Argument must be greater than or equal to 2")
-    (assert (.greaterEquals modulus 0),
-            "Modulus must be non-negative")
-    (cond
-      ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_equal_to_2
-      (.equals modulus 2)
-      (.mod n modulus)
-
-      ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_3_modulo_4
-      (or (= mod8 3) (= mod8 7))
-      (let [m (-> modulus (.add 1) .normalize .halveM .halveM)]
-        (.powermod n m modulus))
-
-      ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_5_modulo_8
-      (= mod8 5)
-      (let [m (-> modulus (.sub 5) .normalize .halveM .halveM .halveM)
-            v (.powermod (.add n n) m modulus)
-            i (-> (.mul v v) (.mul n) (.mul 2) (.sub 1) (.mod modulus))]
-        (-> n (.mul v) (.mul i) (.mod modulus)))
-
-      ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_1_modulo_8
-      (= mod8 1)
-      (let [q   (-> modulus (.sub 1) .normalize)
-            e   (->> q
-                     (iterate #(.halveM %))
-                     (take-while even?)
-                     count)
-            two (new js/sjcl.bn 2)
-            z   (->> (range) rest rest
-                     (map #(new js/sjcl.bn %))
-                     (map #(.powermod % q modulus))
-                     (filter
-                      #(not
-                        (.equals
-                         (.powermod % (.power two (- e 1)) modulus)
-                         1)))
-                     first)
-            x   (.powermod n (-> q (.sub 1) .normalize .halveM) modulus)]
-        (loop [y z,
-               r e,
-               v (-> n (.mul x) (.mod modulus)),
-               w (-> n (.mul x) (.mul x) (.mod modulus))]
-          (if (.equals w 1)
-            v
-            (let [k (->> (range)
-                         (map #(vector
-                                %
-                                (.powermod w (.power two %) modulus)))
-                         (filter #(.equals (second %) 1))
-                         first first)
-                  d (.powermod y (.power two (- r k 1)) modulus)
-                  y (.mod (.mul d d) modulus)
-                  v (.mod (.mul d v) modulus)
-                  w (.mod (.mul w y) modulus)]
-              (recur y k v w)))))
-
-      :else
-      (throw (ex-info "Cannot compute a square root for a non-prime modulus"
-                      {:argument n,
-                       :modulus modulus})))))
 
 (defonce ^:private fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
@@ -172,7 +102,7 @@
            js/window.msCrypto.getRandomValues)
          toArray)
 
-    ;; TODO: fallback to isaac.js
+    ;; TODO: fallback to isaac.js or fix SJCL somehow
     ;; https://github.com/rubycon/isaac.js/blob/master/isaac.js
 
     :else
@@ -193,38 +123,80 @@
         (.mod n))))
 
 ;;; LIBRARY FUNCTIONS
-
-;; TODO: Allow for uncompressed output
-;; TODO: Allow for Base58 output
-(schema/defn x962-point-encode :- Hex
-  "Encode a sjcl.ecc.point as hex using X9.62 compression"
-  [point]
-  (assert (instance? js/sjcl.ecc.point point),
-          "Argument is not an instance of sjcl.ecc.point")
-  (let [x       (-> point .-x .toBits js/sjcl.codec.hex.fromBits)
-        y-even? (-> point .-y even?)]
-    (str (if y-even? "02" "03") x)))
-
 ;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
-;; TODO: Support unencoded points starting with "04"
+(declare x962-point-encode)
+(declare x962-point-decode)
+
 ;; TODO: Support Base58 encoding, raw
 (schema/defn x962-point-decode
   "Decode a sjcl.ecc.point from hex using X9.62 compression"
   [encoded-key :- Hex]
-  (let [x               (-> encoded-key (subs 2) (->> (new js/sjcl.bn)))
-        y-even?         (= (subs encoded-key 0 2) "02")
-        ;; (x * (a + x**2) + b) % p
-        y-squared       (.mod
-                         (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
-                         curve-modulus)
-        y-candidate     (modular-square-root y-squared curve-modulus)
-        y               (if (= y-even? (even? y-candidate))
-                          y-candidate
-                          (.sub curve-modulus y-candidate))]
-    (assert (.equals y-squared
-                     (.mod (.mul y y) curve-modulus)),
-            "Invalid point")
-    (new js/sjcl.ecc.point curve x y)))
+  (cond
+    (contains? #{"02" "03"} (subs encoded-key 0 2))
+    (let [x           (-> encoded-key (subs 2) (->> (new js/sjcl.bn)))
+          y-even?     (= (subs encoded-key 0 2) "02")
+          ;; (x * (a + x**2) + b) % p
+          y-squared   (.mod
+                       (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
+                       curve-modulus)
+          y-candidate (modular-square-root y-squared curve-modulus)
+          y           (if (= y-even? (even? y-candidate))
+                        y-candidate
+                        (.sub curve-modulus y-candidate))]
+      (assert (.equals y-squared
+                       (.mod (.mul y y) curve-modulus)),
+              "Invalid point")
+      (new js/sjcl.ecc.point curve x y))
+    (= "04" (subs encoded-key 0 2))
+    (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
+          y (-> encoded-key (subs 66 130) (->> (new js/sjcl.bn)))]
+      (assert (.equals
+               (.mod
+                (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
+                curve-modulus)
+               (.mod (.mul y y) curve-modulus)),
+              "Invalid point")
+      (new js/sjcl.ecc.point curve x y))
+    :else
+    (throw (ex-info "Cannot handle encoded public key"
+                    {:encoded-key encoded-key}))))
+
+;; TODO: Allow for Base58 output
+(defn x962-point-encode
+  "Encode a sjcl.ecc.point as hex using X9.62 compression"
+  [point & {:keys [:compressed]
+            :or   {:compressed true}}]
+  (cond
+    (instance? js/sjcl.ecc.point point)
+    (if compressed
+      (let [x       (-> point .-x .toBits js/sjcl.codec.hex.fromBits)
+            y-even? (-> point .-y even?)]
+        (str (if y-even? "02" "03") x))
+      (let [x (-> point .-x .toBits js/sjcl.codec.hex.fromBits)
+            y (-> point .-y .toBits js/sjcl.codec.hex.fromBits)]
+        (str "04" x y)))
+
+    (and (hex? point) (contains? #{"02" "03"} (subs point 0 2)))
+    (let [pt (x962-point-decode point)]
+      (assert (= (x962-point-encode pt) point), "Invalid point")
+      (if compressed
+        point
+        (x962-point-encode pt :compressed false)))
+
+    (and
+     (hex? point)
+     (= "04" (subs point 0 2)))
+    (let [pt (x962-point-decode point)]
+      (assert (= (x962-point-encode pt :compressed false) point),
+              "Invalid point")
+      (if-not compressed
+        point
+        (x962-point-encode pt :compressed true)))
+
+    :else
+    (throw (ex-info "Cannot handle argument"
+                    {:argument point
+                     :compressed compressed}))))
 
 (schema/defn get-public-key-from-private-key :- Hex
   "Generate an encoded public key from a private key"
@@ -294,20 +266,22 @@
    (string? data)
    (hex? x962-public-key)
    (hex? hex-signature)
-   (let [pub-key    (x962-point-decode x962-public-key)
-         {r-hex :R,
-          s-hex :S} (DER-decode-ECDSA-signature hex-signature)
-         r          (-> (new js/sjcl.bn r-hex) (.mod (.-r curve)))
-         s-inv      (-> (new js/sjcl.bn s-hex)
-                        (.inverseMod (.-r curve)))
-         hG         (-> data
-                        js/sjcl.hash.sha256.hash
-                        js/sjcl.bn.fromBits
-                        (.mul s-inv)
-                        (.mod (.-r curve)))
-         hA         (-> r (.mul s-inv) (.mod (.-r curve)))
-         r2         (-> curve .-G (.mult2 hG hA pub-key) .-x (.mod (.-r curve)))]
-     (.equals r r2))))
+   (try
+     (let [pub-key    (x962-point-decode x962-public-key)
+           {r-hex :R,
+            s-hex :S} (DER-decode-ECDSA-signature hex-signature)
+           r          (-> (new js/sjcl.bn r-hex) (.mod (.-r curve)))
+           s-inv      (-> (new js/sjcl.bn s-hex)
+                          (.inverseMod (.-r curve)))
+           hG         (-> data
+                          js/sjcl.hash.sha256.hash
+                          js/sjcl.bn.fromBits
+                          (.mul s-inv)
+                          (.mod (.-r curve)))
+           hA         (-> r (.mul s-inv) (.mod (.-r curve)))
+           r2         (-> curve .-G (.mult2 hG hA pub-key) .-x (.mod (.-r curve)))]
+       (.equals r r2))
+     (catch :default _ false))))
 
 (schema/defn validate-sin :- schema/Bool
   "Verify that a SIN is valid"
