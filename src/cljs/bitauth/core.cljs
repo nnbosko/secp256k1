@@ -10,7 +10,7 @@
             [bitauth.formatting :refer [add-leading-zero-if-necessary
                                         DER-encode-ECDSA-signature
                                         DER-decode-ECDSA-signature]]
-            [bitauth.math :refer [modular-square-root even?]]
+            [bitauth.math :refer [modular-square-root even? secure-random]]
             [schema.core :as schema :include-macros true]
             [goog.array :refer [toArray]]
             [goog.crypt]
@@ -32,13 +32,6 @@
        "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"))
 
 ;;; UTILITY FUNCTIONS
-
-#_(defn- even?
-  "Patch the usual cljs.core/even? to work for sjcl.bn instances"
-  [n]
-  (if (instance? js/sjcl.bn n)
-    (.equals (.mod n 2) 0)
-    (cljs.core/even? n)))
 
 (defonce ^:private fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
@@ -78,60 +71,20 @@
             (->> (concat padding)
                  (apply str)))))))
 
-(defn- secure-random-bytes
-  "Generate secure random bytes in a platform independent manner"
-  ;; http://stackoverflow.com/a/19203948/586893
-  [byte-count]
-  (assert (integer? byte-count), "Argument must be an integer")
-  (assert (< 0 byte-count), "Argument must greater than 0")
-  (cond
-    (and (exists? js/window)
-         (exists? js/window.crypto)
-         (exists? js/window.crypto.getRandomValues)
-         (exists? js/Uint8Array))
-    (->> (doto (new js/Uint8Array byte-count)
-           js/window.crypto.getRandomValues)
-         toArray)
-
-    ;; IE
-    (and (exists? js/window)
-         (exists? js/window.msCrypto)
-         (exists? js/window.msCrypto.getRandomValues)
-         (exists? js/Uint8Array))
-    (->> (doto (new js/Uint8Array byte-count)
-           js/window.msCrypto.getRandomValues)
-         toArray)
-
-    ;; TODO: fallback to isaac.js or fix SJCL somehow
-    ;; https://github.com/rubycon/isaac.js/blob/master/isaac.js
-
-    :else
-    (throw (ex-info "Could not securely generate random words"
-                    {:byte-count byte-count}))))
-
-(defn- secure-random
-  "Generate a secure random sjcl.bn, takes a maximal value as an argument"
-  [arg]
-  (let [n          (new js/sjcl.bn arg)
-        byte-count (-> n .bitLength (/ 8))
-        bytes      (secure-random-bytes byte-count)]
-    (-> bytes
-        (->> (map #(add-leading-zero-if-necessary
-                    (.toString % 16)))
-             (apply str)
-             (new js/sjcl.bn))
-        (.mod n))))
-
 ;;; LIBRARY FUNCTIONS
 ;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
 (declare x962-point-encode)
 (declare x962-point-decode)
 
 ;; TODO: Support Base58 encoding, raw
-(schema/defn x962-point-decode
+(defn x962-point-decode
   "Decode a sjcl.ecc.point from hex using X9.62 compression"
-  [encoded-key :- Hex]
+  [encoded-key]
   (cond
+    (instance? js/sjcl.ecc.point encoded-key)
+    ;; TODO: Check the key is valid
+    encoded-key
+
     (contains? #{"02" "03"} (subs encoded-key 0 2))
     (let [x           (-> encoded-key (subs 2) (->> (new js/sjcl.bn)))
           y-even?     (= (subs encoded-key 0 2) "02")
@@ -147,6 +100,7 @@
                        (.mod (.mul y y) curve-modulus)),
               "Invalid point")
       (new js/sjcl.ecc.point curve x y))
+
     (= "04" (subs encoded-key 0 2))
     (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
           y (-> encoded-key (subs 66 130) (->> (new js/sjcl.bn)))]
@@ -157,6 +111,7 @@
                (.mod (.mul y y) curve-modulus)),
               "Invalid point")
       (new js/sjcl.ecc.point curve x y))
+
     :else
     (throw (ex-info "Cannot handle encoded public key"
                     {:encoded-key encoded-key}))))
@@ -194,9 +149,8 @@
         (x962-point-encode pt :compressed true)))
 
     :else
-    (throw (ex-info "Cannot handle argument"
-                    {:argument point
-                     :compressed compressed}))))
+    (throw (ex-info "Cannot handle argument" {:argument point
+                                              :compressed compressed}))))
 
 (schema/defn get-public-key-from-private-key :- Hex
   "Generate an encoded public key from a private key"

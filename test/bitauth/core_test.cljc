@@ -55,7 +55,6 @@
                              (#'bitauth/hex-to-array)
                              (#'bitauth/array-to-hex)))))))
 
-;; TODO: test cljs
 (deftest x962-point-encode-decode
   (testing "x962-point-encode is the left inverse of x962-point-decode"
     (letfn [(encode-decode [x]
@@ -77,6 +76,7 @@
                   bitauth/x962-point-decode
                   (bitauth/x962-point-encode :compressed false)
                   (bitauth/x962-point-encode :compressed false)
+                  bitauth/x962-point-decode
                   bitauth/x962-point-decode
                   bitauth/x962-point-encode
                   (bitauth/x962-point-encode :compressed false)
@@ -193,7 +193,6 @@
         "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
         "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
         ))))
-
 
 (deftest sin-tests
   (testing "Reference sins are valid"

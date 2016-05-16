@@ -140,8 +140,10 @@
   [encoded-key]
   (cond
     (instance? org.spongycastle.math.ec.ECPoint$Fp encoded-key)
-    (let [hex-key (x962-point-encode encoded-key :compressed false)]
-      (assert (= (x962-point-decode hex-key) encoded-key), "Invalid point")
+    (do
+      (assert
+       (let [hex-key (x962-point-encode encoded-key :compressed false)]
+         (= (x962-point-decode hex-key) encoded-key)), "Invalid point")
       encoded-key)
 
     (hex? encoded-key)
