@@ -24,13 +24,6 @@
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve js/sjcl.ecc.curves.k256)
 
-(defonce
-  ^:private
-  ^{:doc "The modulus of the secp256k1 curve"}
-  curve-modulus
-  (new js/sjcl.bn
-       "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"))
-
 ;;; UTILITY FUNCTIONS
 
 (defonce ^:private fifty-eight-chars-string
@@ -91,13 +84,13 @@
           ;; (x * (a + x**2) + b) % p
           y-squared   (.mod
                        (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
-                       curve-modulus)
-          y-candidate (modular-square-root y-squared curve-modulus)
+                       (-> curve .-field .-modulus))
+          y-candidate (modular-square-root y-squared (-> curve .-field .-modulus))
           y           (if (= y-even? (even? y-candidate))
                         y-candidate
-                        (.sub curve-modulus y-candidate))]
+                        (.sub (-> curve .-field .-modulus) y-candidate))]
       (assert (.equals y-squared
-                       (.mod (.mul y y) curve-modulus)),
+                       (.mod (.mul y y) (-> curve .-field .-modulus))),
               "Invalid point")
       (new js/sjcl.ecc.point curve x y))
 
@@ -107,8 +100,8 @@
       (assert (.equals
                (.mod
                 (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
-                curve-modulus)
-               (.mod (.mul y y) curve-modulus)),
+                (-> curve .-field .-modulus))
+               (.mod (.mul y y) (-> curve .-field .-modulus))),
               "Invalid point")
       (new js/sjcl.ecc.point curve x y))
 
@@ -116,7 +109,7 @@
     (throw (ex-info "Cannot handle encoded public key"
                     {:encoded-key encoded-key}))))
 
-;; TODO: Allow for Base58 output
+;; TODO: Allow for Base58/Base64 output
 (defn x962-point-encode
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
   [point & {:keys [:compressed]
@@ -185,9 +178,9 @@
                      .toBits js/sjcl.codec.hex.fromBits)
         pub-key (get-public-key-from-private-key priv-key)]
     {:created (js/Date.now),
-     :priv priv-key,
-     :pub pub-key,
-     :sin (get-sin-from-public-key pub-key)}))
+     :priv    priv-key,
+     :pub     pub-key,
+     :sin     (get-sin-from-public-key pub-key)}))
 
 ;; TODO: Optionally include recovery byte
 (schema/defn sign :- Hex
