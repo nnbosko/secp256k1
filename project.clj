@@ -1,4 +1,4 @@
-(defproject bitauth "0.1.0"
+(defproject bitauth "0.1.1"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
