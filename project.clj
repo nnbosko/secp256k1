@@ -1,4 +1,4 @@
-(defproject bitauth "0.1.1"
+(defproject bitauth "0.1.2"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
@@ -9,7 +9,7 @@
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
   :test-paths ["test"]
   :repositories [["jitpack" "https://jitpack.io"]]
-  :dependencies [[com.github.xcthulhu/sjcl-cljs "0.1.9"]
+  :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
                  [com.madgag.spongycastle/core "1.54.0.0"]
                  [org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.8.51"]
