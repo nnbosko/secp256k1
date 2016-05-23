@@ -13,7 +13,7 @@
            java.security.SecureRandom
            java.util.Arrays
            org.spongycastle.asn1.ASN1InputStream
-           org.spongycastle.asn1.DERInteger
+           org.spongycastle.asn1.ASN1Integer
            org.spongycastle.asn1.DERSequenceGenerator
            org.spongycastle.asn1.sec.SECNamedCurves
            org.spongycastle.crypto.digests.RIPEMD160Digest
@@ -224,8 +224,8 @@
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
       (doto s
-        (.addObject (DERInteger. (get sigs 0)))
-        (.addObject (DERInteger. (get sigs 1)))))
+        (.addObject (ASN1Integer. (get sigs 0)))
+        (.addObject (ASN1Integer. (get sigs 1)))))
     (-> bos .toByteArray array-to-hex)))
 
 (schema/defn ^:private verify :- Boolean
