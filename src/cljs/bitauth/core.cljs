@@ -13,8 +13,6 @@
             [bitauth.math :refer [modular-square-root even? secure-random]]
             [schema.core :as schema :include-macros true]
             [goog.array :refer [toArray]]
-            [goog.crypt]
-            [goog.crypt.Sha256]
             [goog.math.Integer]))
 
 ;;; CONSTANTS
