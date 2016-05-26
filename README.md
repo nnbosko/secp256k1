@@ -8,7 +8,7 @@ Simply include in your `project.clj` file:
 
 ```
 :repositories [["jitpack" "https://jitpack.io"]]
-:dependencies [[com.github.Sepia-Officinalis/clj-bitauth "0.1.1"]]
+:dependencies [[com.github.Sepia-Officinalis/clj-bitauth "0.1.2"]]
 ```
 
 ## Info
