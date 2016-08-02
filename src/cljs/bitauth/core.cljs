@@ -143,13 +143,14 @@
     (throw (ex-info "Cannot handle argument" {:argument point
                                               :compressed compressed}))))
 
-(schema/defn get-public-key-from-private-key :- Hex
+(defn get-public-key-from-private-key
   "Generate an encoded public key from a private key"
-  [priv-key :- Hex]
-  (->> priv-key
-       (new js/sjcl.bn)
-       (.mult (.-G curve))
-       x962-point-encode))
+  [priv-key & {:keys [:compressed]
+               :or   {:compressed true}}]
+  (-> priv-key
+      (->> (new js/sjcl.bn)
+           (.mult (.-G curve)))
+      (x962-point-encode :compressed compressed)))
 
 (schema/defn get-sin-from-public-key :- Base58
   "Generate a SIN from a compressed public key"
@@ -215,16 +216,20 @@
      (let [pub-key    (x962-point-decode x962-public-key)
            {r-hex :R,
             s-hex :S} (DER-decode-ECDSA-signature hex-signature)
-           r          (-> (new js/sjcl.bn r-hex) (.mod (.-r curve)))
+           n          (.-r curve)
+           r          (-> (new js/sjcl.bn r-hex) (.mod n))
            s-inv      (-> (new js/sjcl.bn s-hex)
-                          (.inverseMod (.-r curve)))
-           hG         (-> data
+                          (.inverseMod n))
+           z          (-> data
                           js/sjcl.hash.sha256.hash
                           js/sjcl.bn.fromBits
-                          (.mul s-inv)
+                          ;; No need to mod here
                           (.mod (.-r curve)))
-           hA         (-> r (.mul s-inv) (.mod (.-r curve)))
-           r2         (-> curve .-G (.mult2 hG hA pub-key) .-x (.mod (.-r curve)))]
+           u1         (-> z
+                          (.mul s-inv)
+                          (.mod n))
+           u2         (-> r (.mul s-inv) (.mod n))
+           r2         (-> curve .-G (.mult2 u1 u2 pub-key) .-x (.mod n))]
        (.equals r r2))
      (catch :default _ false))))
 
