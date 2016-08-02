@@ -11,6 +11,10 @@
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
          (bitauth/get-public-key-from-private-key
           "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
+      "Public key should start with a leading zero")
+  (is (= "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
+         (bitauth/get-public-key-from-private-key
+          "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c" :compressed false))
       "Public key should start with a leading zero"))
 
 (deftest known-results-tests
@@ -54,6 +58,18 @@
                              (#'bitauth/array-to-hex)
                              (#'bitauth/hex-to-array)
                              (#'bitauth/array-to-hex)))))))
+
+#?(:clj
+   (deftest hmac-SHA256
+     (testing "Returns the right result for reference HMAC-SHA256 values from wikipedia: https://en.wikipedia.org/wiki/Hash-based_message_authentication_code#Examples"
+       (is (= "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"
+              (-> (#'bitauth/hmac-sha256 "" "")
+                  (#'bitauth/array-to-hex))))
+       (is (= "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+              (-> (#'bitauth/hmac-sha256
+                   "key"
+                   "The quick brown fox jumps over the lazy dog")
+                  (#'bitauth/array-to-hex)))))))
 
 (deftest x962-point-encode-decode
   (testing "x962-point-encode is the left inverse of x962-point-decode"

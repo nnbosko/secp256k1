@@ -17,11 +17,14 @@
            org.spongycastle.asn1.DERSequenceGenerator
            org.spongycastle.asn1.sec.SECNamedCurves
            org.spongycastle.crypto.digests.RIPEMD160Digest
+           org.spongycastle.crypto.digests.SHA256Digest
            org.spongycastle.crypto.generators.ECKeyPairGenerator
+           org.spongycastle.crypto.macs.HMac
            org.spongycastle.crypto.params.ECDomainParameters
            org.spongycastle.crypto.params.ECKeyGenerationParameters
            org.spongycastle.crypto.params.ECPrivateKeyParameters
            org.spongycastle.crypto.params.ECPublicKeyParameters
+           org.spongycastle.crypto.params.KeyParameter
            org.spongycastle.crypto.signers.ECDSASigner))
 
 (defonce
@@ -73,16 +76,37 @@
                          (get hex-chars-string (bit-and v 0x0F))]]
                y)))
 
+(defprotocol ByteSerializable
+  (to-bytes [this]))
+
+(extend-protocol ByteSerializable
+  (Class/forName "[B") (to-bytes [ba] ba)
+  String (to-bytes [s] (.getBytes s "UTF-8"))
+  clojure.lang.Sequential (to-bytes [ba] (byte-array ba)))
+
 (defn- sha256
   "Get the SHA256 hash of a byte-array"
   [data]
   (-> (MessageDigest/getInstance "SHA-256")
-      (.digest data)))
+      (.digest (to-bytes data))))
+
+;; Use spongycastle/bouncycastle because javax.crypto.Mac doesn't support empty keys
+(defn- hmac-sha256
+  "Compute the HMAC given a key and data using SHA256"
+  [k data]
+  (let [data (to-bytes data)
+        hmac (doto  (HMac. (SHA256Digest.))
+               (.init (KeyParameter. (to-bytes k)))
+               (.update data 0 (count data)))
+        o (byte-array (.getMacSize hmac))]
+    (.doFinal hmac o 0)
+    o))
 
 (defn- ripemd-160
   "Get the ripemd-160 hash of a hex string"
-  [a]
-  (let [d (doto (RIPEMD160Digest.) (.update a 0 (count a)))
+  [data]
+  (let [data (to-bytes data)
+        d (doto (RIPEMD160Digest.) (.update data 0 (count data)))
         o (byte-array (.getDigestSize d))]
     (.doFinal d o 0)
     o))
@@ -104,11 +128,30 @@
   (cond
     (instance? org.spongycastle.math.ec.ECPoint$Fp pub-key)
     (if compressed
-      (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
-            y-even? (-> pub-key .getY .toBigInteger even?)]
+      (let [x (-> pub-key
+                  .normalize
+                  .getXCoord
+                  .toBigInteger
+                  (.toString 16)
+                  (zero-pad-left 64))
+            y-even? (-> pub-key
+                        .normalize
+                        .getYCoord
+                        .toBigInteger
+                        even?)]
         (str (if y-even? "02" "03") x))
-      (let [x (-> pub-key .getX .toBigInteger (.toString 16) (zero-pad-left 64))
-            y (-> pub-key .getY .toBigInteger (.toString 16) (zero-pad-left 64))]
+      (let [x (-> pub-key
+                  .normalize
+                  .getXCoord
+                  .toBigInteger
+                  (.toString 16)
+                  (zero-pad-left 64))
+            y (-> pub-key
+                  .normalize
+                  .getYCoord
+                  .toBigInteger
+                  (.toString 16)
+                  (zero-pad-left 64))]
         (str "04" x y)))
 
     (and
@@ -149,18 +192,21 @@
     (hex? encoded-key)
     (->> encoded-key
          hex-to-array
-         (.decodePoint (.getCurve curve)))
+         (.decodePoint (.getCurve curve))
+         .normalize)
 
     :else
     (throw (ex-info "Cannot decode argument" {:argument encoded-key}))))
 
-(schema/defn get-public-key-from-private-key :- Hex
+(defn get-public-key-from-private-key
   "Generate a public key from a private key"
-  [priv-key :- Hex]
+  [priv-key & {:keys [:compressed]
+               :or {:compressed true}}]
   (-> curve
       .getG
       (.multiply (BigInteger. priv-key 16))
-      x962-point-encode))
+      .normalize
+      (x962-point-encode :compressed compressed)))
 
 (defonce ^:private ^:const fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
