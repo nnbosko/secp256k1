@@ -4,27 +4,22 @@
   https://github.com/bitpay/bitauth
   http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
 
-  (:require [bitauth.schema :refer [Hex Base58 hex?]]
-            [schema.core :as schema]
-            [clojure.string :refer [starts-with?]]
+  (:require [clojure.string :refer [starts-with?]]
+            [bitauth.schema :refer [hex?]]
+            [bitauth.hashes :refer [sha256 ripemd-160]]
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
-           java.security.MessageDigest
            java.security.SecureRandom
-           java.util.Arrays
+           javax.xml.bind.DatatypeConverter
            org.spongycastle.asn1.ASN1InputStream
            org.spongycastle.asn1.ASN1Integer
            org.spongycastle.asn1.DERSequenceGenerator
            org.spongycastle.asn1.sec.SECNamedCurves
-           org.spongycastle.crypto.digests.RIPEMD160Digest
-           org.spongycastle.crypto.digests.SHA256Digest
            org.spongycastle.crypto.generators.ECKeyPairGenerator
-           org.spongycastle.crypto.macs.HMac
            org.spongycastle.crypto.params.ECDomainParameters
            org.spongycastle.crypto.params.ECKeyGenerationParameters
            org.spongycastle.crypto.params.ECPrivateKeyParameters
            org.spongycastle.crypto.params.ECPublicKeyParameters
-           org.spongycastle.crypto.params.KeyParameter
            org.spongycastle.crypto.signers.ECDSASigner))
 
 (defonce
@@ -37,83 +32,9 @@
                          (.getN params)
                          (.getH params))))
 
-(defn- strip-0x
-  "Gets rid of the leading `0x` identifier of hex strings"
-  [s]
-  (if (starts-with? (.toLowerCase s) "0x") (.substring s 2) s))
-
-(defn- add-leading-zero-if-necessary
-  "Adds a leading zero to a hex string if it is of odd length"
-  [s]
-  (if (odd? (count s)) (str "0" s) s))
-
-(defn- hex-char-to-byte
-  "Convert a single hexdecimal character to a byte"
-  [c]
-  (-> c (Character/digit 16) byte))
-
-(schema/defn ^:private hex-to-array
-  "Convert a string to a byte array, discarding leading zeros as necessary"
-  [s :- Hex]
-  (->> s
-       strip-0x
-       add-leading-zero-if-necessary
-       (partition 2)
-       (map
-        (fn [[a b]]
-          (+ (bit-shift-left (hex-char-to-byte a) 4)
-             (hex-char-to-byte b))))
-       byte-array))
-
-(defonce ^:private ^:const hex-chars-string "0123456789abcdef")
-
-(schema/defn ^:private array-to-hex :- Hex
-  "Encode a collection of bytes as hex"
-  [b]
-  (apply str (for [x    b
-                   :let [v (bit-and x 0xFF)]
-                   y    [(get hex-chars-string (bit-shift-right v 4))
-                         (get hex-chars-string (bit-and v 0x0F))]]
-               y)))
-
-(defprotocol ByteSerializable
-  (to-bytes [this]))
-
-(extend-protocol ByteSerializable
-  (Class/forName "[B") (to-bytes [ba] ba)
-  String (to-bytes [s] (.getBytes s "UTF-8"))
-  clojure.lang.Sequential (to-bytes [ba] (byte-array ba)))
-
-(defn- sha256
-  "Get the SHA256 hash of a byte-array"
-  [data]
-  (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (to-bytes data))))
-
-;; Use spongycastle/bouncycastle because javax.crypto.Mac doesn't support empty keys
-(defn- hmac-sha256
-  "Compute the HMAC given a key and data using SHA256"
-  [k data]
-  (let [data (to-bytes data)
-        hmac (doto  (HMac. (SHA256Digest.))
-               (.init (KeyParameter. (to-bytes k)))
-               (.update data 0 (count data)))
-        o (byte-array (.getMacSize hmac))]
-    (.doFinal hmac o 0)
-    o))
-
-(defn- ripemd-160
-  "Get the ripemd-160 hash of a hex string"
-  [data]
-  (let [data (to-bytes data)
-        d (doto (RIPEMD160Digest.) (.update data 0 (count data)))
-        o (byte-array (.getDigestSize d))]
-    (.doFinal d o 0)
-    o))
-
-(schema/defn ^:private zero-pad-left :- Hex
+(defn- zero-pad-left
   "Pad a hex string with zeros on the left until it is the specified length"
-  [s :- Hex, n :- schema/Int]
+  [s, n ]
   (if (< (count s) n)
     (apply str (concat (repeat (- n (count s)) \0) s))
     s))
@@ -123,8 +44,8 @@
 
 (defn x962-point-encode
   "Encode a public key as hex using X9.62 compression"
-  [pub-key & {:keys [:compressed]
-              :or {:compressed true}}]
+  [pub-key & {:keys [compressed]
+              :or {compressed true}}]
   (cond
     (instance? org.spongycastle.math.ec.ECPoint$Fp pub-key)
     (if compressed
@@ -191,7 +112,7 @@
 
     (hex? encoded-key)
     (->> encoded-key
-         hex-to-array
+         DatatypeConverter/parseHexBinary
          (.decodePoint (.getCurve curve))
          .normalize)
 
@@ -200,8 +121,8 @@
 
 (defn get-public-key-from-private-key
   "Generate a public key from a private key"
-  [priv-key & {:keys [:compressed]
-               :or {:compressed true}}]
+  [priv-key & {:keys [compressed]
+               :or {compressed true}}]
   (-> curve
       .getG
       (.multiply (BigInteger. priv-key 16))
@@ -211,10 +132,9 @@
 (defonce ^:private ^:const fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
-(schema/defn ^:private
-  hex-to-base58 :- Base58
+(defn- hex-to-base58
   "Encodes a hex-string as a base58-string"
-  [input :- Hex]
+  [input]
   (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
     (loop [acc [], n (BigInteger. input 16)]
       (if (pos? n)
@@ -225,20 +145,20 @@
                     (repeat leading-zeros (first fifty-eight-chars-string))
                     acc))))))
 
-(schema/defn get-sin-from-public-key :- Base58
+(defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
-  [pub-key :- Hex]
+  [pub-key]
   (let [pub-prefixed (->> pub-key
-                          hex-to-array
+                          DatatypeConverter/parseHexBinary
                           sha256
                           ripemd-160
-                          array-to-hex
+                          DatatypeConverter/printHexBinary .toLowerCase
                           (str "0f02"))
         checksum     (-> pub-prefixed
-                         hex-to-array
+                         DatatypeConverter/parseHexBinary
                          sha256
                          sha256
-                         array-to-hex
+                         DatatypeConverter/printHexBinary .toLowerCase
                          (subs 0 8))]
     (-> (str pub-prefixed checksum)
         hex-to-base58)))
@@ -257,9 +177,9 @@
      :pub pub-key,
      :sin (get-sin-from-public-key pub-key)}))
 
-(schema/defn sign :- Hex
+(defn sign
   "Sign some data with a private-key"
-  [priv-key :- Hex, data :- String]
+  [priv-key data]
   (let [input (-> data (.getBytes "UTF-8") sha256)
         spongy-priv-key (-> priv-key
                             (BigInteger. 16)
@@ -272,15 +192,15 @@
       (doto s
         (.addObject (ASN1Integer. (get sigs 0)))
         (.addObject (ASN1Integer. (get sigs 1)))))
-    (-> bos .toByteArray array-to-hex)))
+    (-> bos .toByteArray DatatypeConverter/printHexBinary .toLowerCase)))
 
-(schema/defn ^:private verify :- Boolean
+(defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
-  [pub-key :- Hex, input, hex-signature :- Hex]
+  [pub-key, input, hex-signature]
   (let [spongy-pub-key (-> pub-key
                            x962-point-decode
                            (ECPublicKeyParameters. curve))
-        signature (hex-to-array hex-signature)
+        signature (DatatypeConverter/parseHexBinary hex-signature)
         verifier (doto (ECDSASigner.) (.init false spongy-pub-key))]
     (with-open [decoder (ASN1InputStream. signature)]
       (let [sequence (.readObject decoder)
@@ -288,7 +208,7 @@
             s (-> sequence (.getObjectAt 1) .getValue)]
         (.verifySignature verifier input r s)))))
 
-(schema/defn verify-signature :- Boolean
+(defn verify-signature
   "Verifies that a string of data has been signed"
   [pub-key data hex-signature]
   (and
@@ -299,10 +219,10 @@
      (verify pub-key  (-> data (.getBytes "UTF-8") sha256) hex-signature)
      (catch Exception _ false))))
 
-(schema/defn ^:private
-  base58-to-hex :- Hex
+(defn-
+  base58-to-hex
   "Encodes a base58-string as a hex-string"
-  [s :- Base58]
+  [s]
   (let [padding (->> s
                      (take-while #(= % (first fifty-eight-chars-string)))
                      (map (constantly (byte 0))))]
@@ -318,9 +238,9 @@
              (drop-while zero?)
              (concat padding)
              byte-array
-             array-to-hex)))))
+             DatatypeConverter/printHexBinary .toLowerCase)))))
 
-(schema/defn validate-sin :- schema/Bool
+(defn validate-sin
   "Verify that a SIN is valid"
   [sin]
   (try
@@ -331,13 +251,11 @@
                expected-checksum (-> pub-with-checksum (subs (- len 8) len))
                actual-checksum   (-> pub-with-checksum
                                      (subs 0 (- len 8))
-                                     hex-to-array
+                                     DatatypeConverter/parseHexBinary
                                      sha256
                                      sha256
-                                     array-to-hex
+                                     DatatypeConverter/printHexBinary .toLowerCase
                                      (subs 0 8))]
            (and (clojure.string/starts-with? pub-with-checksum "0f02")
                 (= expected-checksum actual-checksum))))
     (catch Exception _ false)))
-
-(comment (run-tests))

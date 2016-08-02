@@ -1,9 +1,11 @@
 (ns bitauth.core-test
   (:require [bitauth.core :as bitauth]
-            #?(:clj  [clojure.test :refer :all])
-            #?(:cljs [cljs.test :refer-macros [is use-fixtures testing are]])
+            #?(:clj [bitauth.hashes :as hashes])
+            #?(:clj  [clojure.test :refer [is use-fixtures testing are run-tests deftest]]
+               :cljs [cljs.test :refer-macros [is use-fixtures testing are]])
             #?(:cljs [devcards.core :refer-macros [deftest]])
-            [schema.test]))
+            [schema.test])
+  #?(:clj (:import javax.xml.bind.DatatypeConverter)))
 
 (use-fixtures :once schema.test/validate-schemas)
 
@@ -45,31 +47,16 @@
       (is (= sin (bitauth/get-sin-from-public-key pub-key))))))
 
 #?(:clj
-   (deftest array-to-hex-conversion-and-back
-     (testing "Can convert an array of bytes to hex"
-       (is (= "ffffff" (#'bitauth/array-to-hex [0xFF 0xFF 0xFF])))
-       (is (= "aaaaaa" (#'bitauth/array-to-hex [0xAA 0xAA 0xAA]))))
-     (testing "Can convert an array of bytes to hex back and forth"
-       (is (= "00ffffff" (-> [0x00 0xFF 0xFF 0xFF] ;; 32 bits
-                             (#'bitauth/array-to-hex)
-                             (#'bitauth/hex-to-array)
-                             (#'bitauth/array-to-hex))))
-       (is (= "00aaaaaa" (-> [0x00 0xAA 0xAA 0xAA]
-                             (#'bitauth/array-to-hex)
-                             (#'bitauth/hex-to-array)
-                             (#'bitauth/array-to-hex)))))))
-
-#?(:clj
    (deftest hmac-SHA256
      (testing "Returns the right result for reference HMAC-SHA256 values from wikipedia: https://en.wikipedia.org/wiki/Hash-based_message_authentication_code#Examples"
        (is (= "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"
-              (-> (#'bitauth/hmac-sha256 "" "")
-                  (#'bitauth/array-to-hex))))
+              (-> (hashes/hmac-sha256 "" "")
+                  DatatypeConverter/printHexBinary .toLowerCase)))
        (is (= "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
-              (-> (#'bitauth/hmac-sha256
+              (-> (hashes/hmac-sha256
                    "key"
                    "The quick brown fox jumps over the lazy dog")
-                  (#'bitauth/array-to-hex)))))))
+                  DatatypeConverter/printHexBinary .toLowerCase))))))
 
 (deftest x962-point-encode-decode
   (testing "x962-point-encode is the left inverse of x962-point-decode"
