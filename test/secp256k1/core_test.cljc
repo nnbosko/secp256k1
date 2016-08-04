@@ -1,6 +1,6 @@
-(ns bitauth.core-test
-  (:require [bitauth.core :as bitauth]
-            #?(:clj [bitauth.hashes :as hashes])
+(ns secp256k1.core-test
+  (:require [secp256k1.core :as secp256k1]
+            #?(:clj [secp256k1.hashes :as hashes])
             #?(:clj  [clojure.test :refer [is use-fixtures testing are run-tests deftest]]
                :cljs [cljs.test :refer-macros [is use-fixtures testing are]])
             #?(:cljs [devcards.core :refer-macros [deftest]])
@@ -11,11 +11,11 @@
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
-         (bitauth/get-public-key-from-private-key
+         (secp256k1/get-public-key-from-private-key
           "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
       "Public key should start with a leading zero")
   (is (= "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
-         (bitauth/get-public-key-from-private-key
+         (secp256k1/get-public-key-from-private-key
           "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c" :compressed false))
       "Public key should start with a leading zero"))
 
@@ -24,27 +24,27 @@
     (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
           pub-key "02326209e52f6f17e987ec27c56a1321acf3d68088b8fb634f232f12ccbc9a4575",
           sin "Tf3yr5tYvccKNVrE26BrPs6LWZRh8woHwjR"]
-      (is (= pub-key (bitauth/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
           "Public key k1 corresponds to private key")
-      (is (= sin (bitauth/get-sin-from-public-key pub-key))))
+      (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0",
           pub-key "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58",
           sin "TfJq16yg72aV9PqsZkhmiojuBRghdGWYcmj"]
-      (is (= pub-key (bitauth/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
           "Public key k1 corresponds to private key")
-      (is (= sin (bitauth/get-sin-from-public-key pub-key))))
+      (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
     (let [priv-key "e9d5516cb0ae45952fa11473a469587d6c0e8aeef3d6b0cca6f4497c725f314c",
           pub-key "033142109aba8e415c73defc83339dcec52f40ce762421c622347a7840294b3423",
           sin "Tewyxwicyc7dyteKAW1i47oFMc72HTtBckc"]
-      (is (= pub-key (bitauth/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
           "Public key k1 corresponds to private key")
-      (is (= sin (bitauth/get-sin-from-public-key pub-key))))
+      (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
     (let [priv-key "9e15c053f17c0991163073a73bc7e4b234c6c55c5f85bb397ed39f14c46a64bd",
           pub-key "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1",
           sin "TfJXKWBfHBSKf4ciN5LFPQTH5FxvsffvqNW"]
-      (is (= pub-key (bitauth/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
           "Public key k1 corresponds to private key")
-      (is (= sin (bitauth/get-sin-from-public-key pub-key))))))
+      (is (= sin (secp256k1/get-sin-from-public-key pub-key))))))
 
 #?(:clj
    (deftest hmac-SHA256
@@ -61,8 +61,8 @@
 (deftest x962-point-encode-decode
   (testing "x962-point-encode is the left inverse of x962-point-decode"
     (letfn [(encode-decode [x]
-              (bitauth/x962-point-encode
-               (bitauth/x962-point-decode x)))]
+              (secp256k1/x962-point-encode
+               (secp256k1/x962-point-decode x)))]
       (are [y] (= y (encode-decode y))
         "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
         "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
@@ -76,15 +76,15 @@
   (testing "x962-point-encode is the left inverse of x962-point-decode (uncompressed)"
     (letfn [(encode-decode [x]
               (-> x
-                  bitauth/x962-point-decode
-                  (bitauth/x962-point-encode :compressed false)
-                  (bitauth/x962-point-encode :compressed false)
-                  bitauth/x962-point-decode
-                  bitauth/x962-point-decode
-                  bitauth/x962-point-encode
-                  (bitauth/x962-point-encode :compressed false)
-                  bitauth/x962-point-encode
-                  (bitauth/x962-point-encode :compressed false)))]
+                  secp256k1/x962-point-decode
+                  (secp256k1/x962-point-encode :compressed false)
+                  (secp256k1/x962-point-encode :compressed false)
+                  secp256k1/x962-point-decode
+                  secp256k1/x962-point-decode
+                  secp256k1/x962-point-encode
+                  (secp256k1/x962-point-encode :compressed false)
+                  secp256k1/x962-point-encode
+                  (secp256k1/x962-point-encode :compressed false)))]
       (are [y] (= y (encode-decode y))
         "04256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1ca81c29a7307b6c77182b77ce9699b6b2940610b2306825fd38a475dd3c804c4"
         "0433952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58a002d2f3b46b55c54d1780c176119497cb81b0ace382227f2a6b8b3ba1eccd83"
@@ -97,9 +97,9 @@
 
   (testing "x962-point-encoding twice is idempotent"
     (letfn [(encode-decode [x]
-              (bitauth/x962-point-encode
-               (bitauth/x962-point-encode
-                (bitauth/x962-point-decode x))))]
+              (secp256k1/x962-point-encode
+               (secp256k1/x962-point-encode
+                (secp256k1/x962-point-decode x))))]
       (are [y] (= y (encode-decode y))
         "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
         "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
@@ -113,8 +113,8 @@
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
     (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
-          pub-key (bitauth/get-public-key-from-private-key priv-key)]
-      (are [x] (bitauth/verify-signature pub-key x (bitauth/sign priv-key x))
+          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
+      (are [x] (secp256k1/verify-signature pub-key x (secp256k1/sign priv-key x))
         "foo"
 
         "bar"
@@ -136,8 +136,8 @@
 
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-          pub-key (bitauth/get-public-key-from-private-key priv-key)]
-      (are [x y] (bitauth/verify-signature pub-key x y)
+          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
+      (are [x y] (secp256k1/verify-signature pub-key x y)
         "foo"
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
 
@@ -167,8 +167,8 @@
 
   (testing "Bad signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-          pub-key (bitauth/get-public-key-from-private-key priv-key)]
-      (are [x y] (not (bitauth/verify-signature pub-key x y))
+          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
+      (are [x y] (not (secp256k1/verify-signature pub-key x y))
         5
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
 
@@ -199,7 +199,7 @@
 
 (deftest sin-tests
   (testing "Reference sins are valid"
-    (are [x] (bitauth/validate-sin x)
+    (are [x] (secp256k1/validate-sin x)
       "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
       "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
       "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
@@ -209,7 +209,7 @@
       "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))
 
   (testing "Ill-formatted sins are invalid"
-    (are [x] (not (bitauth/validate-sin x))
+    (are [x] (not (secp256k1/validate-sin x))
       7
       (constantly :foo)
       :bar
@@ -225,13 +225,13 @@
 
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
-    (let [{:keys [:priv :pub :sin]} (bitauth/generate-sin)]
-      (is (= pub (bitauth/get-public-key-from-private-key priv)))
+    (let [{:keys [:priv :pub :sin]} (secp256k1/generate-sin)]
+      (is (= pub (secp256k1/get-public-key-from-private-key priv)))
       (is (= sin (-> priv
-                     bitauth/get-public-key-from-private-key
-                     bitauth/get-sin-from-public-key)))
-      (is (bitauth/validate-sin sin))
-      (are [x] (bitauth/verify-signature pub x (bitauth/sign priv x))
+                     secp256k1/get-public-key-from-private-key
+                     secp256k1/get-sin-from-public-key)))
+      (is (secp256k1/validate-sin sin))
+      (are [x] (secp256k1/verify-signature pub x (secp256k1/sign priv x))
         "trololololol"
         "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
         "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"

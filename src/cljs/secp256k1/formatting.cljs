@@ -1,8 +1,8 @@
-(ns bitauth.formatting
+(ns secp256k1.formatting
   "An implementation of the Distinguished Encoding Rules for ECDSA signatures, using hexadecimal strings, and other formatting utilities.
 
   https://en.wikipedia.org/wiki/X.690#DER_encoding"
-  (:require [bitauth.schema :refer [hex?]]))
+  (:require [secp256k1.schema :refer [hex?]]))
 
 (defn add-leading-zero-if-necessary
   "Adds a leading zero to a hex string if it is of odd length"

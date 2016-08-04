@@ -1,4 +1,4 @@
-(ns bitauth.hashes
+(ns secp256k1.hashes
   "Hashing utilities used for elliptic curve cryptography"
 
   (:import

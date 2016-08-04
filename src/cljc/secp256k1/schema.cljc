@@ -1,4 +1,4 @@
-(ns bitauth.schema
+(ns secp256k1.schema
   "Prismatic schema for BitAuth"
   (:require [schema.core :as schema #?@(:cljs [:include-macros true])]
             [clojure.set :refer [subset?]]))

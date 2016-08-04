@@ -1,7 +1,7 @@
-(ns bitauth.formatting-test
+(ns secp256k1.formatting-test
   (:require [cljs.test :refer-macros [is use-fixtures testing are]]
             [devcards.core :refer-macros [deftest]]
-            [bitauth.formatting :as formatting]
+            [secp256k1.formatting :as formatting]
             [schema.test]))
 
 (deftest integer-encoding-tests

@@ -1,16 +1,16 @@
-(ns bitauth.core
+(ns secp256k1.core
   "A ClojureScript implementation of BitPay's BitAuth protocol
 
-   https://github.com/bitpay/bitauth
-   http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
+   https://github.com/bitpay/secp256k1
+   http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
 
   (:refer-clojure :exclude [even?])
-  (:require [bitauth.schema :refer [Hex Base58 hex?]]
+  (:require [secp256k1.schema :refer [Hex Base58 hex?]]
             [sjcl]
-            [bitauth.formatting :refer [add-leading-zero-if-necessary
+            [secp256k1.formatting :refer [add-leading-zero-if-necessary
                                         DER-encode-ECDSA-signature
                                         DER-decode-ECDSA-signature]]
-            [bitauth.math :refer [modular-square-root even? secure-random]]
+            [secp256k1.math :refer [modular-square-root even? secure-random]]
             [schema.core :as schema :include-macros true]
             [goog.array :refer [toArray]]
             [goog.math.Integer]))

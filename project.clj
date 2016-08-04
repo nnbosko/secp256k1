@@ -1,9 +1,9 @@
-(defproject bitauth "0.1.5"
+(defproject secp256k1 "1.0.0"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
   :description "A Clojure(Script) port of BitPay's BitAuth authentical protocol"
-  :url "https://github.com/Sepia-Officinalis/clj-bitauth"
+  :url "https://github.com/Sepia-Officinalis/clj-secp256k1"
   :min-lein-version "2.3.4"
   :jar-exclusions [#"\.DS_Store"]
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
@@ -34,15 +34,15 @@
      :source-paths ["src/cljs" "src/cljc" "test"]
      :figwheel {:devcards true}
      :compiler
-     {:main "bitauth.devcards"
+     {:main "secp256k1.devcards"
       :asset-path "js/compiled/devcards_out"
-      :output-to "dev-resources/public/js/compiled/bitauth_devcards.js"
+      :output-to "dev-resources/public/js/compiled/secp256k1_devcards.js"
       :output-dir "dev-resources/public/js/compiled/devcards_out"
       :source-map-timestamp true}}]}
 
   :scm
   {:name "git"
-   :url "https://github.com/Sepia-Officinalis/clj-bitauth.git"}
+   :url "https://github.com/Sepia-Officinalis/clj-secp256k1.git"}
 
   :pom-addition [:developers [:developer
                               [:id "xcthulhu"]

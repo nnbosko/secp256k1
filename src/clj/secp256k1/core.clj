@@ -1,12 +1,12 @@
-(ns bitauth.core
+(ns secp256k1.core
   "A Clojure implementation of BitPay's BitAuth protocol
 
-  https://github.com/bitpay/bitauth
-  http://blog.bitpay.com/2014/07/01/bitauth-for-decentralized-authentication.html"
+  https://github.com/bitpay/secp256k1
+  http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
 
   (:require [clojure.string :refer [starts-with?]]
-            [bitauth.schema :refer [hex?]]
-            [bitauth.hashes :refer [sha256 ripemd-160]]
+            [secp256k1.schema :refer [hex?]]
+            [secp256k1.hashes :refer [sha256 ripemd-160]]
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.SecureRandom

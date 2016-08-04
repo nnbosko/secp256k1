@@ -1,7 +1,7 @@
-(ns bitauth.math-test
+(ns secp256k1.math-test
   (:require [cljs.test :refer-macros [is use-fixtures testing are]]
             [devcards.core :refer-macros [deftest]]
-            [bitauth.math :refer [modular-square-root]]
+            [secp256k1.math :refer [modular-square-root]]
             [schema.test]))
 
 (use-fixtures :once schema.test/validate-schemas)
