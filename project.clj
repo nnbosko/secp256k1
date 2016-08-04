@@ -13,8 +13,7 @@
                  [com.madgag.spongycastle/core "1.54.0.0"]
                  [org.clojure/clojure "1.9.0-alpha10"]
                  [org.clojure/clojurescript "1.9.93"]
-                 [prismatic/schema "1.1.3"]
-                 [ring/ring-core "1.5.0"]]
+                 [prismatic/schema "1.1.3"]]
 
 
   :clean-targets ^{:protect false}
