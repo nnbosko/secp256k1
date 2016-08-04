@@ -11,7 +11,7 @@
   :repositories [["jitpack" "https://jitpack.io"]]
   :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
                  [com.madgag.spongycastle/core "1.54.0.0"]
-                 [org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojure "1.9.0-alpha10"]
                  [org.clojure/clojurescript "1.9.93"]
                  [prismatic/schema "1.1.3"]
                  [ring/ring-core "1.5.0"]]
