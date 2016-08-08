@@ -5,13 +5,12 @@
    http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
 
   (:refer-clojure :exclude [even?])
-  (:require [secp256k1.schema :refer [Hex Base58 hex?]]
-            [sjcl]
+  (:require [sjcl]
             [secp256k1.formatting :refer [add-leading-zero-if-necessary
-                                        DER-encode-ECDSA-signature
-                                        DER-decode-ECDSA-signature]]
+                                          DER-encode-ECDSA-signature
+                                          DER-decode-ECDSA-signature]]
             [secp256k1.math :refer [modular-square-root even? secure-random]]
-            [schema.core :as schema :include-macros true]
+            [secp256k1.schema :refer [hex? base58?]]
             [goog.array :refer [toArray]]
             [goog.math.Integer]))
 
@@ -31,22 +30,23 @@
 ;; WARNING: I have found bugs with goog.math.Integer:
 ;; https://github.com/google/closure-library/issues/703
 (let [fifty-eight (goog.math.Integer.fromInt 58)]
-  (schema/defn ^:private hex-to-base58 :- Base58
+  (defn- hex-to-base58
     "Encodes a hex-string as a base58-string"
-    ([input :- Hex]
-     (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
-       (loop [acc [], n (goog.math.Integer.fromString input 16)]
-         (if-not (.isZero n)
-           (let [i (-> n (.modulo fifty-eight) .toInt)
-                 s (nth fifty-eight-chars-string i)]
-             (recur (cons s acc) (.divide n fifty-eight)))
-           (apply str (concat
-                       (repeat leading-zeros (first fifty-eight-chars-string))
-                       acc))))))))
+    [input]
+    (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
+      (loop [acc [],
+             n (goog.math.Integer.fromString input 16)]
+        (if-not (.isZero n)
+          (let [i (-> n (.modulo fifty-eight) .toInt)
+                s (nth fifty-eight-chars-string i)]
+            (recur (cons s acc) (.divide n fifty-eight)))
+          (apply str (concat
+                      (repeat leading-zeros (first fifty-eight-chars-string))
+                      acc)))))))
 
-(schema/defn ^:private base58-to-hex :- Hex
+(defn- base58-to-hex
   "Encodes a base58-string as a hex-string"
-  [s :- Base58]
+  [s]
   (let [padding (->> s
                      (take-while #(= % (first fifty-eight-chars-string)))
                      (mapcat (constantly "00")))]
@@ -152,9 +152,9 @@
            (.mult (.-G curve)))
       (x962-point-encode :compressed compressed)))
 
-(schema/defn get-sin-from-public-key :- Base58
+(defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
-  [pub-key :- Hex]
+  [pub-key]
   (let [pub-prefixed (->> pub-key
                           js/sjcl.codec.hex.toBits
                           js/sjcl.hash.sha256.hash
@@ -182,9 +182,9 @@
      :sin     (get-sin-from-public-key pub-key)}))
 
 ;; TODO: Optionally include recovery byte
-(schema/defn sign :- Hex
+(defn sign
   "Sign some data with a private-key"
-  [priv-key-hex :- Hex, data :- schema/Str]
+  [priv-key-hex, data]
   (let [d    (new js/sjcl.bn priv-key-hex)
         n    (.-r curve)
         l    (.bitLength n)
@@ -205,7 +205,7 @@
                :S (-> s (.toBits l) js/sjcl.codec.hex.fromBits)))))))
 
 ;; TODO: Support Base58 encoding
-(schema/defn verify-signature :- schema/Bool
+(defn verify-signature
   "Verifies that a string of data has been signed"
   [x962-public-key data hex-signature]
   (and
@@ -233,7 +233,7 @@
        (.equals r r2))
      (catch :default _ false))))
 
-(schema/defn validate-sin :- schema/Bool
+(defn validate-sin
   "Verify that a SIN is valid"
   [sin]
   (try

@@ -1,10 +1,7 @@
 (ns secp256k1.math-test
   (:require [cljs.test :refer-macros [is use-fixtures testing are]]
             [devcards.core :refer-macros [deftest]]
-            [secp256k1.math :refer [modular-square-root]]
-            [schema.test]))
-
-(use-fixtures :once schema.test/validate-schemas)
+            [secp256k1.math :refer [modular-square-root]]))
 
 (deftest modular-square-root-607
   (testing "Can compute square roots modulo 607 (= 3 mod 8)"

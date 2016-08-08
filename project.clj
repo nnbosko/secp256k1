@@ -1,4 +1,4 @@
-(defproject secp256k1 "1.0.0"
+(defproject secp256k1 "1.0.1"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
@@ -12,8 +12,7 @@
   :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
                  [com.madgag.spongycastle/core "1.54.0.0"]
                  [org.clojure/clojure "1.9.0-alpha10"]
-                 [org.clojure/clojurescript "1.9.93"]
-                 [prismatic/schema "1.1.3"]]
+                 [org.clojure/clojurescript "1.9.93"]]
 
 
   :clean-targets ^{:protect false}

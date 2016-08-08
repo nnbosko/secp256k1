@@ -1,8 +1,7 @@
 (ns secp256k1.formatting-test
   (:require [cljs.test :refer-macros [is use-fixtures testing are]]
             [devcards.core :refer-macros [deftest]]
-            [secp256k1.formatting :as formatting]
-            [schema.test]))
+            [secp256k1.formatting :as formatting]))
 
 (deftest integer-encoding-tests
   (testing "Can encode some known integers"

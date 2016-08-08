@@ -3,11 +3,9 @@
             #?(:clj [secp256k1.hashes :as hashes])
             #?(:clj  [clojure.test :refer [is use-fixtures testing are run-tests deftest]]
                :cljs [cljs.test :refer-macros [is use-fixtures testing are]])
-            #?(:cljs [devcards.core :refer-macros [deftest]])
-            [schema.test])
+            #?(:cljs [devcards.core :refer-macros [deftest]]))
   #?(:clj (:import javax.xml.bind.DatatypeConverter)))
 
-(use-fixtures :once schema.test/validate-schemas)
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
