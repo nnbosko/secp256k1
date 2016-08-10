@@ -32,102 +32,104 @@
                          (.getN params)
                          (.getH params))))
 
-(defn- zero-pad-left
-  "Pad a hex string with zeros on the left until it is the specified length"
-  [s, n ]
-  (if (< (count s) n)
-    (apply str (concat (repeat (- n (count s)) \0) s))
-    s))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(declare x962-point-encode)
-(declare x962-point-decode)
+;; TODO: Write public-key validation function
 
-(defn x962-point-encode
+(defprotocol PrivateKey
+  (private-key [this] [this base]))
+
+;; TODO: Fix Clojure upstream because this class breaks extend-protocol
+(extend-type (Class/forName "[B")
+  PrivateKey
+  (private-key [data]
+    (private-key (BigInteger. 1 data))))
+
+;; A lone java.math.BigInteger is an unboxed private key
+(extend-protocol PrivateKey
+  java.math.BigInteger
+  (private-key
+    [this]
+    ;; TODO: Validate
+    this)
+
+  clojure.lang.BigInt
+  (private-key
+    [this] (-> this .toBigInteger private-key))
+
+  java.lang.String
+  (private-key
+    ([this]
+     (private-key this :hex))
+    ;; TODO: Handle base conversion
+    ([encoded-key base]
+     (-> encoded-key
+         DatatypeConverter/parseHexBinary
+         private-key))))
+
+(defprotocol PublicKey
+  (public-key [this] [this base]))
+
+(extend-type (Class/forName "[B")
+  PublicKey
+  (public-key
+    [data]
+    (-> curve
+        .getCurve
+        (.decodePoint data))))
+
+(extend-protocol PublicKey
+  org.spongycastle.math.ec.ECPoint
+  (public-key
+    [this]
+    ;; TODO: Validate
+    (.normalize this))
+
+  java.lang.String
+  (public-key
+    ([encoded-key]
+     (public-key encoded-key :hex))
+    ;; TODO: handle base conversion
+    ([encoded-key base]
+     (-> encoded-key
+         DatatypeConverter/parseHexBinary
+         public-key)))
+
+  java.math.BigInteger
+  (public-key
+    [this]
+    (-> curve
+        .getG
+        (.multiply this)
+        .normalize))
+
+  clojure.lang.BigInt
+  (public-key
+    [this]
+    (public-key (private-key this))))
+
+(defn x962-encode
   "Encode a public key as hex using X9.62 compression"
   [pub-key & {:keys [compressed]
-              :or {compressed true}}]
-  (cond
-    (instance? org.spongycastle.math.ec.ECPoint$Fp pub-key)
-    (if compressed
-      (let [x (-> pub-key
-                  .normalize
-                  .getXCoord
-                  .toBigInteger
-                  (.toString 16)
-                  (zero-pad-left 64))
-            y-even? (-> pub-key
-                        .normalize
-                        .getYCoord
-                        .toBigInteger
-                        even?)]
-        (str (if y-even? "02" "03") x))
-      (let [x (-> pub-key
-                  .normalize
-                  .getXCoord
-                  .toBigInteger
-                  (.toString 16)
-                  (zero-pad-left 64))
-            y (-> pub-key
-                  .normalize
-                  .getYCoord
-                  .toBigInteger
-                  (.toString 16)
-                  (zero-pad-left 64))]
-        (str "04" x y)))
-
-    (and
-     (hex? pub-key)
-     (#{"02" "03"} (subs pub-key 0 2)))
-    (let [pt (x962-point-decode pub-key)]
-      (assert (= (x962-point-encode pt) pub-key), "Invalid point")
-      (if compressed
-        pub-key
-        (x962-point-encode pt :compressed false)))
-
-    (and
-     (hex? pub-key)
-     (= "04" (subs pub-key 0 2)))
-    (let [pt (x962-point-decode pub-key)]
-      (assert (= (x962-point-encode pt :compressed false) pub-key),
-              "Invalid point")
-      (if-not compressed
-        pub-key
-        (x962-point-encode pt)))
-
-    :else
-    (throw (ex-info "Cannot encode argument"
-                    {:argument pub-key
-                     :compressed compressed}))))
-
-(defn x962-point-decode
-  "Decode a public key using X9.62 compression"
-  [encoded-key]
-  (cond
-    (instance? org.spongycastle.math.ec.ECPoint$Fp encoded-key)
-    (do
-      (assert
-       (let [hex-key (x962-point-encode encoded-key :compressed false)]
-         (= (x962-point-decode hex-key) encoded-key)), "Invalid point")
-      encoded-key)
-
-    (hex? encoded-key)
-    (->> encoded-key
-         DatatypeConverter/parseHexBinary
-         (.decodePoint (.getCurve curve))
-         .normalize)
-
-    :else
-    (throw (ex-info "Cannot decode argument" {:argument encoded-key}))))
+              :or   {compressed true}}]
+  (let [point (public-key pub-key)
+        x (-> point .getXCoord .toBigInteger)
+        y (-> point .getYCoord .toBigInteger)]
+    (-> curve
+        .getCurve
+        (.createPoint x y compressed)
+        .getEncoded
+        DatatypeConverter/printHexBinary
+        .toLowerCase)))
 
 (defn get-public-key-from-private-key
   "Generate a public key from a private key"
   [priv-key & {:keys [compressed]
                :or {compressed true}}]
-  (-> curve
-      .getG
-      (.multiply (BigInteger. priv-key 16))
-      .normalize
-      (x962-point-encode :compressed compressed)))
+  (-> priv-key
+      private-key
+      public-key
+      (x962-encode :compressed compressed)))
 
 (defonce ^:private ^:const fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
@@ -170,7 +172,7 @@
         (-> (ECKeyPairGenerator.)
             (doto (.init (ECKeyGenerationParameters. curve (SecureRandom.))))
             .generateKeyPair
-            .getPrivate .getD (.toString 16) (zero-pad-left 64))
+            .getPrivate .getD (.toString 16))
         pub-key (get-public-key-from-private-key priv-key)]
     {:created (System/currentTimeMillis),
      :priv priv-key,
@@ -198,7 +200,7 @@
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
   [pub-key, input, hex-signature]
   (let [spongy-pub-key (-> pub-key
-                           x962-point-decode
+                           public-key
                            (ECPublicKeyParameters. curve))
         signature (DatatypeConverter/parseHexBinary hex-signature)
         verifier (doto (ECDSASigner.) (.init false spongy-pub-key))]

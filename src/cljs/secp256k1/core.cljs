@@ -11,8 +11,7 @@
                                           DER-decode-ECDSA-signature]]
             [secp256k1.math :refer [modular-square-root even? secure-random]]
             [secp256k1.schema :refer [hex? base58?]]
-            [goog.array :refer [toArray]]
-            [goog.math.Integer]))
+            [goog.math.Integer :as Integer]))
 
 ;;; CONSTANTS
 
@@ -21,21 +20,20 @@
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve js/sjcl.ecc.curves.k256)
 
+;; Move to some library for bases
 ;;; UTILITY FUNCTIONS
 
 (defonce ^:private fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
 ;; This has to use goog.math.Integer because we need divide
-;; WARNING: I have found bugs with goog.math.Integer:
-;; https://github.com/google/closure-library/issues/703
-(let [fifty-eight (goog.math.Integer.fromInt 58)]
+(let [fifty-eight (Integer/fromInt 58)]
   (defn- hex-to-base58
     "Encodes a hex-string as a base58-string"
     [input]
     (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
       (loop [acc [],
-             n (goog.math.Integer.fromString input 16)]
+             n (Integer/fromString input 16)]
         (if-not (.isZero n)
           (let [i (-> n (.modulo fifty-eight) .toInt)
                 s (nth fifty-eight-chars-string i)]
@@ -62,100 +60,120 @@
             (->> (concat padding)
                  (apply str)))))))
 
-;;; LIBRARY FUNCTIONS
-;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
-(declare x962-point-encode)
-(declare x962-point-decode)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO: Support Base58 encoding, raw
-(defn x962-point-decode
-  "Decode a sjcl.ecc.point from hex using X9.62 compression"
-  [encoded-key]
-  (cond
-    (instance? js/sjcl.ecc.point encoded-key)
-    ;; TODO: Check the key is valid
-    encoded-key
+;; TODO: Write public-key validation function
 
-    (contains? #{"02" "03"} (subs encoded-key 0 2))
-    (let [x           (-> encoded-key (subs 2) (->> (new js/sjcl.bn)))
-          y-even?     (= (subs encoded-key 0 2) "02")
-          ;; (x * (a + x**2) + b) % p
-          y-squared   (.mod
-                       (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
-                       (-> curve .-field .-modulus))
-          y-candidate (modular-square-root y-squared (-> curve .-field .-modulus))
-          y           (if (= y-even? (even? y-candidate))
-                        y-candidate
-                        (.sub (-> curve .-field .-modulus) y-candidate))]
-      (assert (.equals y-squared
-                       (.mod (.mul y y) (-> curve .-field .-modulus))),
-              "Invalid point")
-      (new js/sjcl.ecc.point curve x y))
+(defprotocol PrivateKey
+  (private-key [this] [this base]))
 
-    (= "04" (subs encoded-key 0 2))
-    (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
-          y (-> encoded-key (subs 66 130) (->> (new js/sjcl.bn)))]
-      (assert (.equals
-               (.mod
-                (.add (.mul x (.add (.-a curve) (.mul x x))) (.-b curve))
-                (-> curve .-field .-modulus))
-               (.mod (.mul y y) (-> curve .-field .-modulus))),
-              "Invalid point")
-      (new js/sjcl.ecc.point curve x y))
+(extend-protocol PrivateKey
+  js/sjcl.bn ; Unboxed
+  (private-key
+    [this]
+    ;;TODO: Validation
+    this)
 
-    :else
-    (throw (ex-info "Cannot handle encoded public key"
-                    {:encoded-key encoded-key}))))
+  string
+  (private-key
+    ;; TODO: Use base here, use byte arrays if possible
+    ([this base]
+     (private-key (new js/sjcl.bn this)))
+    ([this]
+     (private-key this :hex))))
 
-;; TODO: Allow for Base58/Base64 output
-(defn x962-point-encode
+(defn- valid-point?
+  "Predicate to determine if something is a valid ECC point on our curve"
+  [point]
+  (and (instance? js/sjcl.ecc.point point)
+       (let [x (.-x point)
+             y (.-y point)
+             modulus (-> curve .-field .-modulus)]
+         (and
+          (instance? js/sjcl.bn x)
+          (instance? js/sjcl.bn y)
+          (.equals
+           (.mod
+            (.add (.mul x (.add (.-a curve) (.square x))) (.-b curve))
+            modulus)
+           (.mod (.square y) modulus))))))
+
+(defprotocol PublicKey
+  (public-key [this] [this base]))
+
+(extend-protocol PublicKey
+  js/sjcl.ecc.point ; Unboxed
+  (public-key [point]
+    (assert (valid-point? point) "Invalid point")
+      point)
+
+  string
+  (public-key
+    ;; TODO: Use base here, use byte arrays if possible
+    ([encoded-key base]
+     ;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
+     (cond
+       (#{"02" "03"} (subs encoded-key 0 2))
+       (let [x           (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
+             y-even?     (= (subs encoded-key 0 2) "02")
+             modulus     (-> curve .-field .-modulus)
+             ;; √(x * (a + x**2) + b) % p
+             y-candidate (modular-square-root
+                          (.add
+                           (.mul x (.add (.-a curve) (.square x)))
+                           (.-b curve))
+                          modulus)
+             y          (if (= y-even? (even? y-candidate))
+                          y-candidate
+                          (.sub modulus y-candidate))]
+         (public-key
+          (new js/sjcl.ecc.point curve x y)))
+
+       (= "04" (subs encoded-key 0 2))
+       (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
+             y (-> encoded-key (subs 66) (->> (new js/sjcl.bn)))]
+         (public-key
+          (new js/sjcl.ecc.point curve x y)))
+
+       :else
+       (throw (ex-info "Cannot handle encoded public key"
+                       {:encoded-key encoded-key}))))
+
+    ([this]
+     (assert (hex? this) "Argument must be hexadecimal")
+     (public-key this :hex)))
+
+  js/sjcl.bn
+  (public-key
+    [priv-key]
+    (.mult (.-G curve) (private-key priv-key))))
+
+;; TODO: Allow for Base58/Base64
+(defn x962-encode
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
-  [point & {:keys [:compressed]
-            :or   {:compressed true}}]
-  (cond
-    (instance? js/sjcl.ecc.point point)
+  [pub-key & {:keys [compressed]
+              :or   {compressed true}}]
+  (let [point (public-key pub-key)
+        x     (-> point .-x .toBits js/sjcl.codec.hex.fromBits)]
     (if compressed
-      (let [x       (-> point .-x .toBits js/sjcl.codec.hex.fromBits)
-            y-even? (-> point .-y even?)]
-        (str (if y-even? "02" "03") x))
-      (let [x (-> point .-x .toBits js/sjcl.codec.hex.fromBits)
-            y (-> point .-y .toBits js/sjcl.codec.hex.fromBits)]
-        (str "04" x y)))
-
-    (and (hex? point) (contains? #{"02" "03"} (subs point 0 2)))
-    (let [pt (x962-point-decode point)]
-      (assert (= (x962-point-encode pt) point), "Invalid point")
-      (if compressed
-        point
-        (x962-point-encode pt :compressed false)))
-
-    (and
-     (hex? point)
-     (= "04" (subs point 0 2)))
-    (let [pt (x962-point-decode point)]
-      (assert (= (x962-point-encode pt :compressed false) point),
-              "Invalid point")
-      (if-not compressed
-        point
-        (x962-point-encode pt :compressed true)))
-
-    :else
-    (throw (ex-info "Cannot handle argument" {:argument point
-                                              :compressed compressed}))))
+      (str (if (-> point .-y even?) "02" "03") x)
+      (let [y (-> point .-y .toBits js/sjcl.codec.hex.fromBits)]
+        (str "04" x y)))))
 
 (defn get-public-key-from-private-key
   "Generate an encoded public key from a private key"
-  [priv-key & {:keys [:compressed]
-               :or   {:compressed true}}]
+  [priv-key & {:keys [compressed]
+               :or   {compressed true}}]
   (-> priv-key
-      (->> (new js/sjcl.bn)
-           (.mult (.-G curve)))
-      (x962-point-encode :compressed compressed)))
+      private-key
+      public-key
+      (x962-encode :compressed compressed)))
 
 (defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
   [pub-key]
   (let [pub-prefixed (->> pub-key
+                          x962-encode
                           js/sjcl.codec.hex.toBits
                           js/sjcl.hash.sha256.hash
                           js/sjcl.hash.ripemd160.hash
@@ -213,7 +231,7 @@
    (hex? x962-public-key)
    (hex? hex-signature)
    (try
-     (let [pub-key    (x962-point-decode x962-public-key)
+     (let [pub-key    (public-key x962-public-key)
            {r-hex :R,
             s-hex :S} (DER-decode-ECDSA-signature hex-signature)
            n          (.-r curve)

@@ -56,11 +56,11 @@
                    "The quick brown fox jumps over the lazy dog")
                   DatatypeConverter/printHexBinary .toLowerCase))))))
 
-(deftest x962-point-encode-decode
-  (testing "x962-point-encode is the left inverse of x962-point-decode"
+(deftest x962-encode-decode
+  (testing "x962-encode is the left inverse of x962-point-decode"
     (letfn [(encode-decode [x]
-              (secp256k1/x962-point-encode
-               (secp256k1/x962-point-decode x)))]
+              (secp256k1/x962-encode
+               (secp256k1/public-key x)))]
       (are [y] (= y (encode-decode y))
         "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
         "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
@@ -71,18 +71,18 @@
         "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
         "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))
 
-  (testing "x962-point-encode is the left inverse of x962-point-decode (uncompressed)"
+  (testing "x962-encode is the left inverse of x962-point-decode (uncompressed)"
     (letfn [(encode-decode [x]
               (-> x
-                  secp256k1/x962-point-decode
-                  (secp256k1/x962-point-encode :compressed false)
-                  (secp256k1/x962-point-encode :compressed false)
-                  secp256k1/x962-point-decode
-                  secp256k1/x962-point-decode
-                  secp256k1/x962-point-encode
-                  (secp256k1/x962-point-encode :compressed false)
-                  secp256k1/x962-point-encode
-                  (secp256k1/x962-point-encode :compressed false)))]
+                  secp256k1/public-key
+                  (secp256k1/x962-encode :compressed false)
+                  (secp256k1/x962-encode :compressed false)
+                  secp256k1/public-key
+                  secp256k1/public-key
+                  secp256k1/x962-encode
+                  (secp256k1/x962-encode :compressed false)
+                  secp256k1/x962-encode
+                  (secp256k1/x962-encode :compressed false)))]
       (are [y] (= y (encode-decode y))
         "04256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1ca81c29a7307b6c77182b77ce9699b6b2940610b2306825fd38a475dd3c804c4"
         "0433952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58a002d2f3b46b55c54d1780c176119497cb81b0ace382227f2a6b8b3ba1eccd83"
@@ -95,9 +95,9 @@
 
   (testing "x962-point-encoding twice is idempotent"
     (letfn [(encode-decode [x]
-              (secp256k1/x962-point-encode
-               (secp256k1/x962-point-encode
-                (secp256k1/x962-point-decode x))))]
+              (secp256k1/x962-encode
+               (secp256k1/x962-encode
+                (secp256k1/public-key x))))]
       (are [y] (= y (encode-decode y))
         "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
         "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
