@@ -86,7 +86,7 @@
   @struct
   "
   (js* "
-function isaac () {
+function () {
     var m = Array(256),  // internal memory
         acc = 0,  // accumulator
         brs = 0,  // last result
@@ -279,14 +279,14 @@ function isaac () {
     }
 
 
-    /* public: return a random number between */
+    /* public: return a random unsigned 32 bit integer */
     function rand() {
         if (0 !== gnt --) {
             prng();
             gnt = 255;
         }
 
-        return r[gnt];
+        return r[gnt] >>> 0;
     }
 
 
@@ -310,27 +310,27 @@ function isaac () {
 "))
 
 (defn- secure-random-bytes
-  "Generate secure random bytes in a platform independent manner"
+  "Generate secure random bytes (in 32 bit chunks) in a platform independent manner"
   ;; http://stackoverflow.com/a/19203948/586893
   [byte-count]
   (assert (integer? byte-count), "Argument must be an integer")
   (assert (< 0 byte-count), "Argument must greater than 0")
+  (assert (= 0 (mod byte-count 4)),
+          "Must be able to represent resulting array in  32 bits chunks")
   (cond
-    (and (exists? js/window)
-         (exists? js/window.crypto)
-         (exists? js/window.crypto.getRandomValues)
-         (exists? js/Uint8Array))
-    (->> (doto (new js/Uint8Array byte-count)
-           js/window.crypto.getRandomValues)
+    (and (exists? js/crypto)
+         (exists? js/crypto.getRandomValues)
+         (exists? js/Uint32Array))
+    (->> (doto (new js/Uint32Array (/ byte-count 4))
+           js/crypto.getRandomValues)
          toArray)
 
     ;; IE
-    (and (exists? js/window)
-         (exists? js/window.msCrypto)
-         (exists? js/window.msCrypto.getRandomValues)
-         (exists? js/Uint8Array))
-    (->> (doto (new js/Uint8Array byte-count)
-           js/window.msCrypto.getRandomValues)
+    (and (exists? js/msCrypto)
+         (exists? js/msCrypto.getRandomValues)
+         (exists? js/Uint32Array))
+    (->> (doto (new js/Uint32Array (/ byte-count 4))
+           js/msCrypto.getRandomValues)
          toArray)
 
     ;; TODO: Fix SJCL's RNG somehow
@@ -338,10 +338,7 @@ function isaac () {
     :else
     ;; Fallback to isaac.js
     (let [rng (new isaac)]
-      (clj->js
-       (repeatedly
-        byte-count
-        #(-> rng .rand (unsigned-bit-shift-right 0)))))))
+      (clj->js (repeatedly (/ byte-count 4) #(.rand rng))))))
 
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"
