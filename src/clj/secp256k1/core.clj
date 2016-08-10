@@ -45,12 +45,13 @@
   (private-key [data]
     (private-key (BigInteger. 1 data))))
 
-;; A lone java.math.BigInteger is an unboxed private key
 (extend-protocol PrivateKey
-  java.math.BigInteger
+  java.math.BigInteger ; Unboxed
   (private-key
     [this]
-    ;; TODO: Validate
+    (assert (<= 1 this) "Private key should be at least 1")
+    (assert (<= this (.getN curve))
+            "Private key should be less than curve modulus")
     this)
 
   clojure.lang.BigInt
@@ -74,16 +75,27 @@
   PublicKey
   (public-key
     [data]
-    (-> curve
-        .getCurve
-        (.decodePoint data))))
+    (public-key (.decodePoint (.getCurve curve) data))))
+
+(defn- valid-point?
+  [point]
+  (and (instance? org.spongycastle.math.ec.ECPoint point)
+       (let [x       (-> point .getXCoord .toBigInteger)
+             y       (-> point .getYCoord .toBigInteger)
+             ecc     (.getCurve curve)
+             a       (-> ecc .getA .toBigInteger)
+             b       (-> ecc .getB .toBigInteger)
+             p       (-> ecc .getField .getCharacteristic)]
+         (= (mod (+ (* x x x) (* a x) b) p)
+            (mod (* y y) p)))))
 
 (extend-protocol PublicKey
-  org.spongycastle.math.ec.ECPoint
+  org.spongycastle.math.ec.ECPoint ; Unboxed
   (public-key
     [this]
-    ;; TODO: Validate
-    (.normalize this))
+    (let [point (.normalize this)]
+      (assert (valid-point? point) "Invalid Point")
+      point))
 
   java.lang.String
   (public-key
@@ -100,7 +112,7 @@
     [this]
     (-> curve
         .getG
-        (.multiply this)
+        (.multiply (private-key this))
         .normalize))
 
   clojure.lang.BigInt
@@ -118,6 +130,7 @@
     (-> curve
         .getCurve
         (.createPoint x y compressed)
+        .normalize
         .getEncoded
         DatatypeConverter/printHexBinary
         .toLowerCase)))
@@ -172,7 +185,7 @@
         (-> (ECKeyPairGenerator.)
             (doto (.init (ECKeyGenerationParameters. curve (SecureRandom.))))
             .generateKeyPair
-            .getPrivate .getD (.toString 16))
+            .getPrivate .getD)
         pub-key (get-public-key-from-private-key priv-key)]
     {:created (System/currentTimeMillis),
      :priv priv-key,
@@ -184,7 +197,7 @@
   [priv-key data]
   (let [input (-> data (.getBytes "UTF-8") sha256)
         spongy-priv-key (-> priv-key
-                            (BigInteger. 16)
+                            private-key
                             (ECPrivateKeyParameters. curve))
         sigs (-> (ECDSASigner.)
                  (doto (.init true spongy-priv-key))
