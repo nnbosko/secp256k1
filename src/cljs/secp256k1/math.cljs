@@ -79,8 +79,14 @@
                       {:argument n,
                        :modulus modulus})))))
 
-(js* "
-function isaac() {
+;; https://github.com/rubycon/isaac.js/blob/master/isaac.js
+(def ^:private isaac
+  "
+  @constructor
+  @struct
+  "
+  (js* "
+function isaac () {
     var m = Array(256),  // internal memory
         acc = 0,  // accumulator
         brs = 0,  // last result
@@ -230,7 +236,7 @@ function isaac() {
         return this_isaac;
     }
 
-    seed((Math.random() * 0xffffffff) ^ Time.now());
+    seed((Math.random() * 0xffffffff) ^ Date.now());
 
 
     /* public: isaac generator, n = number of run */
@@ -301,7 +307,7 @@ function isaac() {
     this_isaac.rand = rand;
     this_isaac.internals = internals;
 }
-")
+"))
 
 (defn- secure-random-bytes
   "Generate secure random bytes in a platform independent manner"
@@ -327,12 +333,15 @@ function isaac() {
            js/window.msCrypto.getRandomValues)
          toArray)
 
-    ;; TODO: fallback to isaac.js or fix SJCL somehow
-    ;; https://github.com/rubycon/isaac.js/blob/master/isaac.js
+    ;; TODO: Fix SJCL's RNG somehow
 
     :else
-    (throw (ex-info "Could not securely generate random words"
-                    {:byte-count byte-count}))))
+    ;; Fallback to isaac.js
+    (let [rng (new isaac)]
+      (clj->js
+       (repeatedly
+        byte-count
+        #(-> rng .rand (unsigned-bit-shift-right 0)))))))
 
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"
