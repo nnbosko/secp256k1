@@ -62,21 +62,22 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO: Write public-key validation function
-
 (defprotocol PrivateKey
   (private-key [this] [this base]))
 
 (extend-protocol PrivateKey
   js/sjcl.bn ; Unboxed
   (private-key
-    [this]
-    ;;TODO: Validation
-    this)
+    [priv-key]
+    (assert (= (.greaterEquals priv-key 1) 1)
+            "Private key should be greater than or equal to 1")
+    (assert (= (.greaterEquals (.-r curve) priv-key) 1)
+            "Private key should be less than or equal to the curve modulus")
+    priv-key)
 
   string
   (private-key
-    ;; TODO: Use base here, use byte arrays if possible
+    ;; TODO: Use base here
     ([this base]
      (private-key (new js/sjcl.bn this)))
     ([this]
@@ -88,14 +89,14 @@
   (and (instance? js/sjcl.ecc.point point)
        (let [x (.-x point)
              y (.-y point)
+             a (.-a curve)
+             b (.-b curve)
              modulus (-> curve .-field .-modulus)]
          (and
           (instance? js/sjcl.bn x)
           (instance? js/sjcl.bn y)
           (.equals
-           (.mod
-            (.add (.mul x (.add (.-a curve) (.square x))) (.-b curve))
-            modulus)
+           (.mod (.add (.mul x (.add a (.square x))) b) modulus)
            (.mod (.square y) modulus))))))
 
 (defprotocol PublicKey
@@ -109,11 +110,12 @@
 
   string
   (public-key
-    ;; TODO: Use base here, use byte arrays if possible
+    ;; TODO: Use base here
     ([encoded-key base]
      ;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
      (cond
-       (#{"02" "03"} (subs encoded-key 0 2))
+       (and (#{"02" "03"} (subs encoded-key 0 2))
+            (= 66 (count encoded-key)))
        (let [x           (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
              y-even?     (= (subs encoded-key 0 2) "02")
              modulus     (-> curve .-field .-modulus)
@@ -191,8 +193,7 @@
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
   []
-  (let [priv-key (-> (secure-random (.-r curve))
-                     .toBits js/sjcl.codec.hex.fromBits)
+  (let [priv-key (secure-random (.-r curve))
         pub-key (get-public-key-from-private-key priv-key)]
     {:created (js/Date.now),
      :priv    priv-key,
@@ -228,7 +229,6 @@
   [x962-public-key data hex-signature]
   (and
    (string? data)
-   (hex? x962-public-key)
    (hex? hex-signature)
    (try
      (let [pub-key    (public-key x962-public-key)
