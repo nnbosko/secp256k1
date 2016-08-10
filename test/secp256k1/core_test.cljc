@@ -9,13 +9,21 @@
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
-         (secp256k1/get-public-key-from-private-key
-          "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             secp256k1/private-key
+             secp256k1/x962-encode))
       "Public key should start with a leading zero")
   (is (= "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
-         (secp256k1/get-public-key-from-private-key
-          "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c" :compressed false))
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             secp256k1/private-key
+             (secp256k1/x962-encode :compressed false)))
       "Public key should start with a leading zero"))
+
+(deftest get-public-key-from-private-key-sad-path
+  (testing "Throws when trying to make a private key that's too big"
+    (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                    :cljs js/Error)
+                 (secp256k1/private-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c9999999999999")))))
 
 (deftest known-results-tests
   (testing "A number of known priv-key, pub-key and SINs as reference"
@@ -70,6 +78,21 @@
         "03fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c"
         "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
         "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5")))
+
+
+  (testing "Sad path: `secp256k1/public-key` and `secp256k1/x962-encode` throw on bad input"
+    (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                    :cljs js/Error)
+                (secp256k1/x962-encode "02bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")))
+    (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                    :cljs js/Error)
+                 (secp256k1/public-key "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
+    (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                    :cljs js/Error)
+                 (secp256k1/x962-encode "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
+   (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                    :cljs js/Error)
+                 (secp256k1/x962-encode "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"))))
 
   (testing "x962-encode is the left inverse of x962-point-decode (uncompressed)"
     (letfn [(encode-decode [x]
