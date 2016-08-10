@@ -31,7 +31,8 @@
   :doo {:paths {:slimer    "./node_modules/.bin/slimerjs"
                 :phantomjs "./node_modules/.bin/phantomjs"
                 :karma     "./node_modules/.bin/karma"}
-        :alias {:all      [:browsers :headless]}}
+        :alias {:headless [:slimer :phantom :nashorn]
+                :all      [:browsers :headless]}}
 
   :cljsbuild
   {:builds
@@ -40,7 +41,7 @@
      :compiler
      {:output-to     "target/js/compiled/testable.js"
       :main          "secp256k1.test-runner"
-      :optimizations :none}}
+      :optimizations :whitespace}}
     {:id           "test-advanced"
      :source-paths ["src/cljs" "src/cljc" "test"]
      :compiler
