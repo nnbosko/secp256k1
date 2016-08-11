@@ -36,7 +36,7 @@
     o))
 
 (defn ripemd-160
-  "Get the ripemd-160 hash of a hex string"
+  "Get the ripemd-160 hash"
   [data]
   (let [data (to-bytes data)
         d (doto (RIPEMD160Digest.) (.update data 0 (count data)))
