@@ -161,9 +161,10 @@
                     acc))))))
 
 (defn get-sin-from-public-key
-  "Generate a SIN from a compressed public key"
+  "Generate a SIN from a public key"
   [pub-key]
   (let [pub-prefixed (->> pub-key
+                          x962-encode
                           DatatypeConverter/parseHexBinary
                           sha256
                           ripemd-160
