@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [even?])
   (:require [sjcl]
             [secp256k1.formatting :refer [add-leading-zero-if-necessary]]
-            [goog.array :refer [toArray]]))
+            [goog.array :refer [toArray]])
+  (:import [secp256k1.math.random Isaac]))
 
 (defn even?
   "Patch the usual cljs.core/even? to work for sjcl.bn instances"
@@ -17,9 +18,9 @@
   (let [modulus (new js/sjcl.bn modulus)
         n       (.mod (new js/sjcl.bn n) modulus)
         mod8    (-> modulus (.mod 8) .toString js/parseInt)]
-    (assert (.greaterEquals n 2),
+    (assert (= (.greaterEquals n 2) 1),
             "Argument must be greater than or equal to 2")
-    (assert (.greaterEquals modulus 0),
+    (assert (= (.greaterEquals modulus 0) 1),
             "Modulus must be non-negative")
     (cond
       ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_equal_to_2
@@ -79,266 +80,36 @@
                       {:argument n,
                        :modulus modulus})))))
 
-;; https://github.com/rubycon/isaac.js/blob/master/isaac.js
-(def ^:private isaac
-  "
-  @constructor
-  @struct
-  "
-  (js* "
-function () {
-    var m = Array(256),  // internal memory
-        acc = 0,  // accumulator
-        brs = 0,  // last result
-        cnt = 0,  // counter
-        r = Array(256),  // result array
-        gnt = 0,  // generation counter
-        this_isaac = this;
-
-
-    /* private: 32-bit integer safe adder */
-    function add(x, y) {
-        var lsb = (x & 0xffff) + (y & 0xffff);
-
-        var msb = (x >>> 16) + (y >>> 16) + (lsb >>> 16);
-
-        return (msb << 16) | (lsb & 0xffff);
-    }
-
-
-    /* public: initialisation */
-    function reset() {
-        acc = brs = cnt = 0;
-
-        for (var i = 0; i < 256; ++ i) m[i] = r[i] = 0;
-        gnt = 0;
-
-        return this_isaac;
-    }
-
-
-    /* public: seeding function */
-    function seed(s) {
-        var a, b, c, d, e, f, g, h, i;
-
-
-        /* seeding the seeds of love */
-        a = b = c = d = e = f = g = h = 0x9e3779b9;
-
-        if (s && typeof (s) === \"number\") {
-            s = [
-                s
-            ];
-        }
-
-        if (s instanceof Array) {
-            reset();
-
-            for (i = 0; i < s.length; i ++) r[i & 0xff] += (typeof (s[i]) === \"number\") ? s[i] : 0;
-        }
-
-
-        /* private: seed mixer */
-        function seed_mix() {
-            a ^= b << 11;
-            d = add(d, a);
-            b = add(b, c);
-            b ^= c >>> 2;
-            e = add(e, b);
-            c = add(c, d);
-            c ^= d << 8;
-            f = add(f, c);
-            d = add(d, e);
-            d ^= e >>> 16;
-            g = add(g, d);
-            e = add(e, f);
-            e ^= f << 10;
-            h = add(h, e);
-            f = add(f, g);
-            f ^= g >>> 4;
-            a = add(a, f);
-            g = add(g, h);
-            g ^= h << 8;
-            b = add(b, g);
-            h = add(h, a);
-            h ^= a >>> 9;
-            c = add(c, h);
-            a = add(a, b);
-        }
-
-        for (i = 0; i < 4; i ++)
-
-
-        /* scramble it */
-        seed_mix();
-
-        for (i = 0; i < 256; i += 8) {
-            if (s) {
-                /* use all the information in the seed */
-                a = add(a, r[i + 0]);
-                b = add(b, r[i + 1]);
-                c = add(c, r[i + 2]);
-                d = add(d, r[i + 3]);
-                e = add(e, r[i + 4]);
-                f = add(f, r[i + 5]);
-                g = add(g, r[i + 6]);
-                h = add(h, r[i + 7]);
-            }
-
-            seed_mix();
-
-
-            /* fill in m[] with messy stuff */
-            m[i + 0] = a;
-            m[i + 1] = b;
-            m[i + 2] = c;
-            m[i + 3] = d;
-            m[i + 4] = e;
-            m[i + 5] = f;
-            m[i + 6] = g;
-            m[i + 7] = h;
-        }
-
-        if (s) {
-            /* do a second pass to make all of the seed affect all of m[] */
-            for (i = 0; i < 256; i += 8) {
-                a = add(a, m[i + 0]);
-                b = add(b, m[i + 1]);
-                c = add(c, m[i + 2]);
-                d = add(d, m[i + 3]);
-                e = add(e, m[i + 4]);
-                f = add(f, m[i + 5]);
-                g = add(g, m[i + 6]);
-                h = add(h, m[i + 7]);
-                seed_mix();
-
-
-                /* fill in m[] with messy stuff (again) */
-                m[i + 0] = a;
-                m[i + 1] = b;
-                m[i + 2] = c;
-                m[i + 3] = d;
-                m[i + 4] = e;
-                m[i + 5] = f;
-                m[i + 6] = g;
-                m[i + 7] = h;
-            }
-        }
-
-        prng();
-
-
-        /* fill in the first set of results */
-        gnt = 256;
-
-
-        /* prepare to use the first set of results */
-        return this_isaac;
-    }
-
-    seed((Math.random() * 0xffffffff) ^ Date.now());
-
-
-    /* public: isaac generator, n = number of run */
-    function prng(n) {
-        var i, x, y;
-
-        n = (n && typeof (n) === \"number\") ? Math.abs(Math.floor(n)) : 1;
-
-        while (n --) {
-            cnt = add(cnt, 1);
-            brs = add(brs, cnt);
-
-            for (i = 0; i < 256; i ++) {
-                switch (i & 3) {
-                    case 0:
-                        acc ^= acc << 13;
-                        break;
-
-                    case 1:
-                        acc ^= acc >>> 6;
-                        break;
-
-                    case 2:
-                        acc ^= acc << 2;
-                        break;
-
-                    case 3:
-                        acc ^= acc >>> 16;
-                        break;
-                }
-
-                acc = add(m[(i + 128) & 0xff], acc);
-                x = m[i];
-                m[i] = y = add(m[(x >>> 2) & 0xff], add(acc, brs));
-                r[i] = brs = add(m[(y >>> 10) & 0xff], x);
-            }
-        }
-
-        return this_isaac;
-    }
-
-
-    /* public: return a random unsigned 32 bit integer */
-    function rand() {
-        if (0 !== gnt --) {
-            prng();
-            gnt = 255;
-        }
-
-        return r[gnt] >>> 0;
-    }
-
-
-    /* public: return internals in an object*/
-    function internals() {
-        return {
-            a: acc,
-            b: brs,
-            c: cnt,
-            m: m,
-            r: r
-        };
-    }
-
-    this_isaac.reset = reset;
-    this_isaac.seed = seed;
-    this_isaac.prng = prng;
-    this_isaac.rand = rand;
-    this_isaac.internals = internals;
-}
-"))
-
 (defn- secure-random-bytes
-  "Generate secure random bytes (in 32 bit chunks) in a platform independent manner"
+  "Generate secure random bytes in a platform independent manner"
   ;; http://stackoverflow.com/a/19203948/586893
   [byte-count]
-  (assert (integer? byte-count), "Argument must be an integer")
-  (assert (< 0 byte-count), "Argument must greater than 0")
-  (assert (= 0 (mod byte-count 4)),
-          "Must be able to represent resulting array in  32 bits chunks")
+  (assert (integer? byte-count) "Argument must be an integer")
+  (assert (pos? byte-count) "Argument must greater than 0")
   (cond
     (and (exists? js/crypto)
          (exists? js/crypto.getRandomValues)
-         (exists? js/Uint32Array))
-    (->> (doto (new js/Uint32Array (/ byte-count 4))
+         (exists? js/Uint8Array))
+    (->> (doto (new js/Uint8Array byte-count)
            js/crypto.getRandomValues)
          toArray)
 
     ;; IE
     (and (exists? js/msCrypto)
          (exists? js/msCrypto.getRandomValues)
-         (exists? js/Uint32Array))
-    (->> (doto (new js/Uint32Array (/ byte-count 4))
+         (exists? js/Uint8Array))
+    (->> (doto (new js/Uint8Array byte-count)
            js/msCrypto.getRandomValues)
          toArray)
 
-    ;; TODO: Fix SJCL's RNG somehow
-
     :else
     ;; Fallback to isaac.js
-    (let [rng (new isaac)]
-      (clj->js (repeatedly (/ byte-count 4) #(.rand rng))))))
+    (let [rng (new Isaac)]
+      (->>
+       (repeatedly (/ byte-count 4) #(.rand rng))
+       (mapcat #(for [i (range 4)]
+                  (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))) )
+       clj->js))))
 
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"

@@ -37,13 +37,13 @@
   :cljsbuild
   {:builds
    [{:id           "test"
-     :source-paths ["src/cljs" "src/cljc" "test"]
+     :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :compiler
      {:output-to     "target/js/compiled/testable.js"
       :main          "secp256k1.test-runner"
       :optimizations :whitespace}}
     {:id           "test-advanced"
-     :source-paths ["src/cljs" "src/cljc" "test"]
+     :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :compiler
      {:output-to     "target/js/compiled/testable.min.js"
       :main          "secp256k1.test-runner"

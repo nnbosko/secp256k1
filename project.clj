@@ -6,7 +6,7 @@
   :url "https://github.com/Sepia-Officinalis/clj-secp256k1"
   :min-lein-version "2.3.4"
   :jar-exclusions [#"\.DS_Store"]
-  :source-paths ["src/clj" "src/cljs" "src/cljc"]
+  :source-paths ["src/clj" "src/cljs" "src/cljc" "src/js"]
   :test-paths ["test"]
   :repositories [["jitpack" "https://jitpack.io"]]
   :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
@@ -30,7 +30,7 @@
   :cljsbuild
   {:builds
    [{:id "devcards"
-     :source-paths ["src/cljs" "src/cljc" "test"]
+     :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :figwheel {:devcards true}
      :compiler
      {:main "secp256k1.devcards"

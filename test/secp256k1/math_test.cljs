@@ -1,7 +1,8 @@
 (ns secp256k1.math-test
   (:require [cljs.test :refer-macros [is use-fixtures testing are]]
             [devcards.core :refer-macros [deftest]]
-            [secp256k1.math :refer [modular-square-root]]))
+            [secp256k1.math :refer [modular-square-root]])
+  (:import [secp256k1.math.random Isaac]))
 
 (deftest modular-square-root-607
   (testing "Can compute square roots modulo 607 (= 3 mod 8)"
@@ -42,3 +43,9 @@
               (.mod prime)
               .toString
               js/parseInt))))))
+
+(deftest isaac-js
+  (testing "Isaac.js has basic functionality"
+    (is (integer? (-> (new Isaac) .rand)))
+    (is (pos? (-> (new Isaac) .rand)))
+    (is (= 3967595742 (-> (new Isaac) (.seed 5) .rand)))))
