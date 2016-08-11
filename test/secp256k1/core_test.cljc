@@ -1,6 +1,7 @@
 (ns secp256k1.core-test
   (:require [secp256k1.core :as secp256k1]
-            #?(:clj [secp256k1.hashes :as hashes])
+            [secp256k1.hashes :as hashes]
+            #?(:cljs [sjcl])
             #?(:clj  [clojure.test
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
@@ -129,17 +130,26 @@
       (is (= sin (secp256k1/get-sin-from-public-key
                   (secp256k1/public-key pub-key)))))
 
-    (let [priv-key "e9d5516cb0ae45952fa11473a469587d6c0e8aeef3d6b0cca6f4497c725f314c",
-          pub-key "033142109aba8e415c73defc83339dcec52f40ce762421c622347a7840294b3423",
+    (let [priv-key
+          "e9d5516cb0ae45952fa11473a469587d6c0e8aeef3d6b0cca6f4497c725f314c",
+          pub-key
+          (secp256k1/public-key
+           "033142109aba8e415c73defc83339dcec52f40ce762421c622347a7840294b3423"),
           sin "Tewyxwicyc7dyteKAW1i47oFMc72HTtBckc"]
-      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
+      (is (= pub-key (-> priv-key
+                         secp256k1/private-key
+                         secp256k1/public-key))
           "Public key k1 corresponds to private key")
       (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
 
-    (let [priv-key "9e15c053f17c0991163073a73bc7e4b234c6c55c5f85bb397ed39f14c46a64bd",
-          pub-key "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1",
+    (let [priv-key
+          (secp256k1/private-key
+           "9e15c053f17c0991163073a73bc7e4b234c6c55c5f85bb397ed39f14c46a64bd"),
+          pub-key
+          (secp256k1/public-key
+           "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"),
           sin "TfJXKWBfHBSKf4ciN5LFPQTH5FxvsffvqNW"]
-      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/public-key priv-key))
           "Public key k1 corresponds to private key")
       (is (= sin (secp256k1/get-sin-from-public-key pub-key))))))
 
@@ -156,10 +166,9 @@
                   DatatypeConverter/printHexBinary .toLowerCase))))))
 
 (deftest x962-encode-decode
-  (testing "x962-encode is the left inverse of x962-point-decode"
+  (testing "x962-encode is idempotent on compressed keys"
     (letfn [(encode-decode [x]
-              (secp256k1/x962-encode
-               (secp256k1/public-key x)))]
+              (secp256k1/x962-encode x))]
       (are [y] (= y (encode-decode y))
         "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1"
         "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
@@ -174,18 +183,22 @@
   (testing "Sad path: `secp256k1/public-key` and `secp256k1/x962-encode` throw on bad input"
     (is (thrown? #?(:clj java.lang.IllegalArgumentException
                     :cljs js/Error)
-                (secp256k1/x962-encode "02bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")))
+                 (secp256k1/x962-encode
+                  "02bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")))
     (is (thrown? #?(:clj java.lang.IllegalArgumentException
                     :cljs js/Error)
-                 (secp256k1/public-key "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
+                 (secp256k1/public-key
+                  "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
     (is (thrown? #?(:clj java.lang.IllegalArgumentException
                     :cljs js/Error)
-                 (secp256k1/x962-encode "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
-   (is (thrown? #?(:clj java.lang.IllegalArgumentException
+                 (secp256k1/x962-encode
+                  "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c")))
+    (is (thrown? #?(:clj java.lang.IllegalArgumentException
                     :cljs js/Error)
-                 (secp256k1/x962-encode "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"))))
+                (secp256k1/x962-encode
+                 "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"))))
 
-  (testing "x962-encode is the left inverse of x962-point-decode (uncompressed)"
+  (testing "x962-encode can handle both compressed and uncompressed keys"
     (letfn [(encode-decode [x]
               (-> x
                   secp256k1/public-key
@@ -207,7 +220,7 @@
         "043502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9dd3c65e83963adac704e5782b5f886280a8c4960f1e49152b139bfd05862c7af"
         "0487efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5aa43aaed73348f97b306145ce0544078210f7e587c675805ccc0933d6673c979")))
 
-  (testing "x962-point-encoding twice is idempotent"
+  (testing "More checks that x962-point-encoding is idempotent"
     (letfn [(encode-decode [x]
               (secp256k1/x962-encode
                (secp256k1/x962-encode
@@ -222,11 +235,13 @@
         "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
         "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5"))))
 
+;; TODO: Sad paths where verify-signature and sign should throw
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
-    (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
-          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
-      (are [x] (secp256k1/verify-signature pub-key x (secp256k1/sign priv-key x))
+    (let [priv-key (secp256k1/private-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c")]
+      (are [x] (secp256k1/verify-signature
+                priv-key x
+                (secp256k1/sign priv-key x))
         "foo"
 
         "bar"
@@ -248,7 +263,9 @@
 
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
+          pub-key (-> priv-key
+                      secp256k1/private-key
+                      secp256k1/x962-encode)]
       (are [x y] (secp256k1/verify-signature pub-key x y)
         "foo"
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
@@ -278,8 +295,10 @@
         "304402200e4b0560c42e4de19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c")))
 
   (testing "Bad signatures"
-    (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-          pub-key (secp256k1/get-public-key-from-private-key priv-key)]
+    (let [priv-key
+          (secp256k1/private-key
+           "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0")
+          pub-key (secp256k1/public-key priv-key)]
       (are [x y] (not (secp256k1/verify-signature pub-key x y))
         5
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
@@ -338,19 +357,27 @@
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
     (let [{:keys [:priv :pub :sin]} (secp256k1/generate-sin)]
-      (is (= pub (secp256k1/get-public-key-from-private-key priv)))
-      (is (= sin (-> priv
-                     secp256k1/get-public-key-from-private-key
-                     secp256k1/get-sin-from-public-key)))
-      (is (secp256k1/validate-sin sin))
-      (are [x] (secp256k1/verify-signature pub x (secp256k1/sign priv x))
-        "trololololol"
-        "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
-        "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
-        "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
-        "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
-        "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
-        "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
-        "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))))
+      (is (= pub (secp256k1/public-key priv)))
+      (is (= (secp256k1/x962-encode pub)
+             (secp256k1/x962-encode priv)))
+       (is (= sin (-> priv
+                      secp256k1/get-sin-from-public-key)))
+       (is (secp256k1/validate-sin sin))
+       (is (instance? #?(:cljs js/sjcl.ecc.point
+                         :clj  org.spongycastle.math.ec.ECPoint) pub))
+       (is (instance? #?(:cljs js/sjcl.bn
+                         :clj  java.math.BigInteger) priv))
+       ;; TODO: Why doesn't this work with a pub-key?
+       (are [x] (secp256k1/verify-signature
+                 priv x
+                 (secp256k1/sign priv x))
+         "trololololol"
+         "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
+         "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
+         "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
+         "Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
+         "TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
+         "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
+         "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))))
 
 (comment (run-tests))

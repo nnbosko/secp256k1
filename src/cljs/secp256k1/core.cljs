@@ -133,7 +133,9 @@
      (cond
        (and (#{"02" "03"} (subs encoded-key 0 2))
             (= 66 (count encoded-key)))
-       (let [x           (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
+       (let [x           (-> encoded-key
+                             (subs 2 66)
+                             (->> (new js/sjcl.bn)))
              y-even?     (= (subs encoded-key 0 2) "02")
              modulus     (-> curve .-field .-modulus)
              ;; √(x * (a + x**2) + b) % p
@@ -178,15 +180,6 @@
       (let [y (-> point .-y .toBits js/sjcl.codec.hex.fromBits)]
         (str "04" x y)))))
 
-(defn get-public-key-from-private-key
-  "Generate an encoded public key from a private key"
-  [priv-key & {:keys [compressed]
-               :or   {compressed true}}]
-  (-> priv-key
-      private-key
-      public-key
-      (x962-encode :compressed compressed)))
-
 (defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
   [pub-key]
@@ -209,18 +202,18 @@
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
   []
-  (let [priv-key (secure-random (.-r curve))
-        pub-key (get-public-key-from-private-key priv-key)]
+  (let [priv-key (private-key (secure-random (.-r curve)))]
     {:created (js/Date.now),
      :priv    priv-key,
-     :pub     pub-key,
-     :sin     (get-sin-from-public-key pub-key)}))
+     :pub     (public-key priv-key),
+     :sin     (get-sin-from-public-key priv-key)
+     }))
 
 ;; TODO: Optionally include recovery byte
 (defn sign
   "Sign some data with a private-key"
-  [priv-key-hex, data]
-  (let [d    (new js/sjcl.bn priv-key-hex)
+  [priv-key data]
+  (let [d    (private-key priv-key)
         n    (.-r curve)
         l    (.bitLength n)
         hash (js/sjcl.hash.sha256.hash data)
@@ -229,6 +222,7 @@
                    hash)
                  js/sjcl.bn.fromBits)]
     (loop []
+      ;; TODO: Use RFC 6979 here
       (let [k (.add (secure-random (.sub n 1)) 1)
             r (-> curve .-G (.mult k) .-x (.mod n))
             s (-> (.mul r d) (.add z) (.mul (.inverseMod k n)) (.mod n))]
@@ -242,30 +236,33 @@
 ;; TODO: Support Base58 encoding
 (defn verify-signature
   "Verifies that a string of data has been signed"
-  [x962-public-key data hex-signature]
+  [key data hex-signature]
   (and
    (string? data)
+   (satisfies? PublicKey key)
    (hex? hex-signature)
    (try
-     (let [pub-key    (public-key x962-public-key)
-           {r-hex :R,
+     (let [{r-hex :R,
             s-hex :S} (DER-decode-ECDSA-signature hex-signature)
+           pub-key    (if (instance? js/sjcl.ecc.point key)
+                        key
+                        (public-key key))
            n          (.-r curve)
            r          (-> (new js/sjcl.bn r-hex) (.mod n))
-           s-inv      (-> (new js/sjcl.bn s-hex)
-                          (.inverseMod n))
+           s-inv      (-> (new js/sjcl.bn s-hex) (.inverseMod n))
            z          (-> data
                           js/sjcl.hash.sha256.hash
                           js/sjcl.bn.fromBits
-                          ;; No need to mod here
-                          (.mod (.-r curve)))
+                          (.mod n))
            u1         (-> z
                           (.mul s-inv)
                           (.mod n))
            u2         (-> r (.mul s-inv) (.mod n))
-           r2         (-> curve .-G (.mult2 u1 u2 pub-key) .-x (.mod n))]
-       (.equals r r2))
-     (catch :default _ false))))
+           r2         (-> curve .-G
+                          (.mult2 u1 u2 pub-key)
+                          .-x (.mod n))]
+       (= r r2))
+     (catch js/Error _ false))))
 
 (defn validate-sin
   "Verify that a SIN is valid"
@@ -285,4 +282,4 @@
                                      (subs 0 8))]
            (and (clojure.string/starts-with? pub-with-checksum "0f02")
                 (= expected-checksum actual-checksum))))
-    (catch js/Object _ false)))
+    (catch js/Error _ false)))

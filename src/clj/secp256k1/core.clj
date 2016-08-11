@@ -1,8 +1,5 @@
 (ns secp256k1.core
-  "A Clojure implementation of BitPay's BitAuth protocol
-
-  https://github.com/bitpay/secp256k1
-  http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
+  "ECDSA secp256k1 signatures in Clojure."
 
   (:require [clojure.string :refer [starts-with?]]
             [secp256k1.schema :refer [hex?]]
@@ -32,52 +29,38 @@
                          (.getN params)
                          (.getH params))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; TODO: Write public-key validation function
-
 (defprotocol PrivateKey
   (private-key [this] [this base]))
 
-;; TODO: Fix Clojure upstream because this class breaks extend-protocol
-(extend-type (Class/forName "[B")
-  PrivateKey
-  (private-key [data]
-    (private-key (BigInteger. 1 data))))
-
 (extend-protocol PrivateKey
+  (Class/forName "[B")
+  (private-key [data]
+    (private-key (BigInteger. 1 data)))
+
   java.math.BigInteger ; Unboxed
   (private-key
-    [this]
-    (assert (<= 1 this) "Private key should be at least 1")
-    (assert (<= this (.getN curve))
+    [priv-key]
+    (assert (<= 1 priv-key) "Private key should be at least 1")
+    (assert (<= priv-key (.getN curve))
             "Private key should be less than curve modulus")
-    this)
+    priv-key)
 
   clojure.lang.BigInt
   (private-key
-    [this] (-> this .toBigInteger private-key))
+    [priv-key] (-> priv-key .toBigInteger private-key))
 
   java.lang.String
   (private-key
-    ([this]
-     (private-key this :hex))
+    ([priv-key]
+     (private-key priv-key :hex))
     ;; TODO: Handle base conversion
     ([encoded-key base]
      (-> encoded-key
          DatatypeConverter/parseHexBinary
          private-key))))
 
-(defprotocol PublicKey
-  (public-key [this] [this base]))
-
-(extend-type (Class/forName "[B")
-  PublicKey
-  (public-key
-    [data]
-    (public-key (.decodePoint (.getCurve curve) data))))
-
 (defn- valid-point?
+  "Determine if an Secp256k1 point is valid"
   [point]
   (and (instance? org.spongycastle.math.ec.ECPoint point)
        (let [x       (-> point .getXCoord .toBigInteger)
@@ -89,7 +72,15 @@
          (= (mod (+ (* x x x) (* a x) b) p)
             (mod (* y y) p)))))
 
+(defprotocol PublicKey
+  (public-key [this] [this base]))
+
 (extend-protocol PublicKey
+  (Class/forName "[B")
+  (public-key
+    [data]
+    (public-key (.decodePoint (.getCurve curve) data)))
+
   org.spongycastle.math.ec.ECPoint ; Unboxed
   (public-key
     [this]
@@ -176,21 +167,24 @@
                          sha256
                          DatatypeConverter/printHexBinary .toLowerCase
                          (subs 0 8))]
-    (-> (str pub-prefixed checksum)
-        hex-to-base58)))
+    (hex-to-base58 (str pub-prefixed checksum))))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
   []
   (let [priv-key
         (-> (ECKeyPairGenerator.)
-            (doto (.init (ECKeyGenerationParameters. curve (SecureRandom.))))
+            (doto (.init
+                   (ECKeyGenerationParameters.
+                    curve
+                    (SecureRandom.))))
             .generateKeyPair
-            .getPrivate .getD)
-        pub-key (get-public-key-from-private-key priv-key)]
+            .getPrivate .getD
+            private-key)
+        pub-key (public-key priv-key)]
     {:created (System/currentTimeMillis),
      :priv priv-key,
-     :pub pub-key,
+     :pub (public-key priv-key),
      :sin (get-sin-from-public-key pub-key)}))
 
 (defn sign
@@ -208,12 +202,15 @@
       (doto s
         (.addObject (ASN1Integer. (get sigs 0)))
         (.addObject (ASN1Integer. (get sigs 1)))))
-    (-> bos .toByteArray DatatypeConverter/printHexBinary .toLowerCase)))
+    (-> bos
+        .toByteArray
+        DatatypeConverter/printHexBinary
+        .toLowerCase)))
 
 (defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
-  [pub-key, input, hex-signature]
-  (let [spongy-pub-key (-> pub-key
+  [key, input, hex-signature]
+  (let [spongy-pub-key (-> key
                            public-key
                            (ECPublicKeyParameters. curve))
         signature (DatatypeConverter/parseHexBinary hex-signature)
@@ -226,13 +223,13 @@
 
 (defn verify-signature
   "Verifies that a string of data has been signed"
-  [pub-key data hex-signature]
+  [key data hex-signature]
   (and
    (string? data)
-   (hex? pub-key)
+   (satisfies? PublicKey key)
    (hex? hex-signature)
    (try
-     (verify pub-key  (-> data (.getBytes "UTF-8") sha256) hex-signature)
+     (verify key (sha256 data) hex-signature)
      (catch Exception _ false))))
 
 (defn-
