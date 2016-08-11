@@ -83,6 +83,24 @@
     ([this]
      (private-key this :hex))))
 
+(extend-protocol IEquiv
+  js/sjcl.bn
+  (-equiv [a b]
+    (and
+     (instance? js/sjcl.bn b)
+     (.equals a b)))
+
+  js/sjcl.ecc.point
+  (-equiv [a b]
+    (and
+     (instance? js/sjcl.ecc.point b)
+     (let [ax (.-x a)
+           bx (.-x b)
+           ay (.-y a)
+           by (.-y b)]
+       (and (= ax bx)
+            (= ay by))))))
+
 (defn- valid-point?
   "Predicate to determine if something is a valid ECC point on our curve"
   [point]
@@ -95,9 +113,8 @@
          (and
           (instance? js/sjcl.bn x)
           (instance? js/sjcl.bn y)
-          (.equals
-           (.mod (.add (.mul x (.add a (.square x))) b) modulus)
-           (.mod (.square y) modulus))))))
+          (= (.mod (.add (.mul x (.add a (.square x))) b) modulus)
+             (.mod (.square y) modulus))))))
 
 (defprotocol PublicKey
   (public-key [this] [this base]))
@@ -106,7 +123,7 @@
   js/sjcl.ecc.point ; Unboxed
   (public-key [point]
     (assert (valid-point? point) "Invalid point")
-      point)
+    point)
 
   string
   (public-key
@@ -146,8 +163,7 @@
      (public-key this :hex)))
 
   js/sjcl.bn
-  (public-key
-    [priv-key]
+  (public-key [priv-key]
     (.mult (.-G curve) (private-key priv-key))))
 
 ;; TODO: Allow for Base58/Base64
