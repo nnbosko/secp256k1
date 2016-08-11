@@ -1,11 +1,14 @@
 (ns secp256k1.core-test
   (:require [secp256k1.core :as secp256k1]
             #?(:clj [secp256k1.hashes :as hashes])
-            #?(:clj  [clojure.test :refer [is use-fixtures testing are run-tests deftest]]
-               :cljs [cljs.test :refer-macros [is use-fixtures testing are]])
+            #?(:clj  [clojure.test
+                      :refer [is use-fixtures
+                              testing are run-tests deftest]]
+               :cljs [cljs.test
+                      :refer-macros [is use-fixtures
+                                     testing are run-tests]])
             #?(:cljs [devcards.core :refer-macros [deftest]]))
   #?(:clj (:import javax.xml.bind.DatatypeConverter)))
-
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
@@ -19,32 +22,120 @@
              (secp256k1/x962-encode :compressed false)))
       "Public key should start with a leading zero"))
 
-(deftest get-public-key-from-private-key-sad-path
+(deftest public-private-key-equality
+  (testing "Checking that equality works for private-keys"
+    (is
+     (=
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c")
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
+     "Reflexivity")
+    (is
+     (=
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c")
+      (secp256k1/private-key
+       (secp256k1/private-key
+        "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c")))
+     "Idempotence for private-key protocol")
+    (is
+     (not=
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c")
+      (secp256k1/private-key
+       "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c"))
+      "Sad path for equality (same type)")
+    (is
+     (not=
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c")
+      :foo)
+      "Sad path for equality (keyword type)"))
+  (testing "Checking that equality works for public-keys"
+    (is
+     (=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"))
+     "Reflexivity")
+    (is
+     (=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      (secp256k1/public-key
+       (secp256k1/public-key
+        "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")))
+     "Idempotence for public-key protocol")
+    (is
+     (not=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      (secp256k1/public-key
+       "033142109aba8e415c73defc83339dcec52f40ce762421c622347a7840294b3423"))
+     "Sad path for equality (same type)")
+    (is
+     (not=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      "test")
+     "Sad path for equality (string type)")
+    (is
+     (not=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      (secp256k1/private-key
+       "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"))
+     "Sad path for equality (other object is a private-key)")
+    (is
+     (=
+      (secp256k1/public-key
+       "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1")
+      (secp256k1/public-key
+       "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"))
+      "Compressed and uncompressed public keys are equal")))
+
+(deftest get-private-key-sad-path
   (testing "Throws when trying to make a private key that's too big"
-    (is (thrown? #?(:clj java.lang.IllegalArgumentException
-                    :cljs js/Error)
-                 (secp256k1/private-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c9999999999999")))))
+    (is
+     (thrown?
+      #?(:clj java.lang.IllegalArgumentException
+         :cljs js/Error)
+      (secp256k1/private-key
+       "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c9999999999999")))))
 
 (deftest known-results-tests
   (testing "A number of known priv-key, pub-key and SINs as reference"
-    (let [priv-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
-          pub-key "02326209e52f6f17e987ec27c56a1321acf3d68088b8fb634f232f12ccbc9a4575",
+    (let [priv-key
+          "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c",
+          pub-key
+          "02326209e52f6f17e987ec27c56a1321acf3d68088b8fb634f232f12ccbc9a4575",
           sin "Tf3yr5tYvccKNVrE26BrPs6LWZRh8woHwjR"]
-      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
+      (is (= pub-key (-> priv-key
+                         secp256k1/private-key
+                         secp256k1/x962-encode))
           "Public key k1 corresponds to private key")
       (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
-    (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0",
-          pub-key "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58",
+
+    (let [priv-key
+          (secp256k1/private-key
+           "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"),
+          pub-key
+          "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58",
           sin "TfJq16yg72aV9PqsZkhmiojuBRghdGWYcmj"]
-      (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
+      (is (= pub-key (secp256k1/x962-encode priv-key))
           "Public key k1 corresponds to private key")
-      (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
+      (is (= sin (secp256k1/get-sin-from-public-key
+                  (secp256k1/public-key pub-key)))))
+
     (let [priv-key "e9d5516cb0ae45952fa11473a469587d6c0e8aeef3d6b0cca6f4497c725f314c",
           pub-key "033142109aba8e415c73defc83339dcec52f40ce762421c622347a7840294b3423",
           sin "Tewyxwicyc7dyteKAW1i47oFMc72HTtBckc"]
       (is (= pub-key (secp256k1/get-public-key-from-private-key priv-key))
           "Public key k1 corresponds to private key")
       (is (= sin (secp256k1/get-sin-from-public-key pub-key))))
+
     (let [priv-key "9e15c053f17c0991163073a73bc7e4b234c6c55c5f85bb397ed39f14c46a64bd",
           pub-key "02256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1",
           sin "TfJXKWBfHBSKf4ciN5LFPQTH5FxvsffvqNW"]
