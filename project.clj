@@ -2,8 +2,8 @@
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}
-  :description "A Clojure(Script) port of BitPay's BitAuth authentical protocol"
-  :url "https://github.com/Sepia-Officinalis/clj-secp256k1"
+  :description "A Clojure(Script) implementation of ECDSA with the secp256k1 elliptic curve"
+  :url "https://github.com/Sepia-Officinalis/secp256k1"
   :min-lein-version "2.3.4"
   :jar-exclusions [#"\.DS_Store"]
   :source-paths ["src/clj" "src/cljs" "src/cljc" "src/js"]
@@ -12,7 +12,7 @@
   :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
                  [com.madgag.spongycastle/core "1.54.0.0"]
                  [org.clojure/clojure "1.9.0-alpha10"]
-                 [org.clojure/clojurescript "1.9.93"]]
+                 [org.clojure/clojurescript "1.9.198"]]
 
 
   :clean-targets ^{:protect false}
@@ -41,7 +41,7 @@
 
   :scm
   {:name "git"
-   :url "https://github.com/Sepia-Officinalis/clj-secp256k1.git"}
+   :url "https://github.com/Sepia-Officinalis/secp256k1.git"}
 
   :pom-addition [:developers [:developer
                               [:id "xcthulhu"]
