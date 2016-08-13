@@ -1,10 +1,29 @@
 (ns secp256k1.formatting.base-convert
+  "Utilities for doing base conversions"
   (:require [clojure.set :refer [subset?]]
             [clojure.string :refer [lower-case]]
             #?@(:cljs [[goog.crypt]
+                       [sjcl]
                        [goog.crypt.base64]
                        [goog.math.Integer :as Integer]]))
   #?(:clj (:import javax.xml.bind.DatatypeConverter)))
+
+;; Implementation notes:
+;;
+;; While byte-arrays are first class in Clojure,
+;; sadly hex-arrays are first class in ClojureScript
+;;
+;; Rationale:
+;;
+;; The Google Closure library sometimes deals in byte arrays
+;;    - For instance, in goog.crypt.base64, goog.crypt/byteArrayToHex,
+;;      and goog.crypt/hexTobytearray
+;;
+;; However goog.math.Integer deals in arrays of signed words, and currently
+;; has broken multiplication.
+;;    - For instance, goog.math.Integer/fromBits
+;;
+;; Similarly, sjcl only deals in arrays of signed words
 
 (let [hex-chars-set (set "0123456789ABCDEFabcdef")]
   (defn hex?
@@ -27,29 +46,12 @@
   (assert (hex? s) "Argument must be a hexadecimal string")
   (if (odd? (count s)) (str "0" s) s))
 
-#?(:cljs
-   (defn base58-to-hex
-     "Encodes a base58-string as a hex-string"
-     [s]
-     (let [padding (->> s
-                        (take-while #(= % (first base-fifty-eight-chars)))
-                        (mapcat (constantly "00")))]
-       (loop [result (new js/sjcl.bn 0), s s]
-         (if-not (empty? s)
-           (recur (.add (.mul result 58)
-                        (.indexOf base-fifty-eight-chars (first s)))
-                  (rest s))
-           (-> result
-               .toBits
-               js/sjcl.codec.hex.fromBits
-               add-leading-zero-if-necessary
-               (->> (concat padding) (apply str))))))))
-
 #?(:clj
    (defn-
      base58-to-array
      "Encodes a base58-string as a byte-array"
      [s]
+     (assert (base58? s) "Input must be in base 58")
      (let [padding (->> s
                         (take-while
                          #(= % (first base-fifty-eight-chars)))
@@ -66,26 +68,44 @@
                 (concat padding)
                 byte-array)))))
    :cljs
-   (defn- base58-to-array
-     "Encodes a base58-string as a byte-array"
+   (defn base58-to-hex
+     "Encodes a base 58 string as a hexadecimal string"
      [s]
-     (-> s
-         base58-to-array
-         goog.crypt/hexToByteArray)))
+     (assert (base58? s) "Input must be in base 58")
+     (let [padding (->> s
+                        (take-while #(= % (first base-fifty-eight-chars)))
+                        (mapcat (constantly "00")))]
+       (loop [result (new js/sjcl.bn 0), s s]
+         (if-not (empty? s)
+           (recur (.add (.mul result 58)
+                        (.indexOf base-fifty-eight-chars (first s)))
+                  (rest s))
+           (-> result
+               .toBits
+               js/sjcl.codec.hex.fromBits
+               add-leading-zero-if-necessary
+               (->> (concat padding)
+                    (apply str))))))))
 
 (defn base-to-array
   [data base]
   (case base
     :hex   #?(:clj  (DatatypeConverter/parseHexBinary data)
               :cljs (goog.crypt/hexToByteArray data))
-    :base58 (base58-to-array data)
+    :base64 #?(:clj (DatatypeConverter/parseBase64Binary data)
+               :cljs (goog.crypt.base64/decodeStringToByteArray data))
+    :base58 #?(:clj  (base58-to-array data)
+               :cljs (-> data
+                         base58-to-hex
+                         goog.crypt/hexToByteArray))
     (throw (ex-info "Unsupported base"
                     {:data data
                      :base base}))))
 
+
 #?(:clj
    (defn- array-to-base58
-     "Encodes a byte array as a base58-string"
+     "Encodes a byte array as a base 58 string"
      [data]
      (let [leading-zeros
            (->> data (take-while zero?) count)]
@@ -100,22 +120,19 @@
                        acc))))))
    :cljs
    (let [fifty-eight (Integer/fromInt 58)]
-     (defn- array-to-base58
-       "Encodes a byte-array as a base58-string"
+     (defn hex-to-base58
+       "Encodes a hexadecimal string as a base 58 string"
        [input]
-       (let [leading-zeros (->> input (take-while zero?) count)]
+       (assert (hex? input) "Input must be in hexadecimal")
+       (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
          (loop [acc [],
-                n
-                (-> input
-                    goog.crypt/byteArrayToHex
-                    (Integer/fromString 16))]
+                n (Integer/fromString input 16)]
            (if-not (.isZero n)
              (let [i (-> n (.modulo fifty-eight) .toInt)
                    s (nth base-fifty-eight-chars i)]
                (recur (cons s acc) (.divide n fifty-eight)))
              (apply str (concat
-                         (repeat leading-zeros
-                                 (first base-fifty-eight-chars))
+                         (repeat leading-zeros (first base-fifty-eight-chars))
                          acc))))))))
 
 #?(:cljs
@@ -128,8 +145,7 @@
 
 (defn array-to-base
   [data output-format]
-  #?(:cljs (assert (bytes? data)
-                    "Data must be a sequence of unsigned bytes"))
+  #?(:cljs (assert (bytes? data) "Data must be a sequence of unsigned bytes"))
   (let [data #?(:clj (byte-array data)
                 :cljs (clj->js data))]
     (case output-format
@@ -139,8 +155,30 @@
                  :cljs (goog.crypt/byteArrayToHex data))
       :base64 #?(:clj (DatatypeConverter/printBase64Binary data)
                  :cljs (goog.crypt.base64/encodeByteArray data))
-      :base58 (array-to-base58 data)
+      :base58 #?(:clj (array-to-base58 data)
+                 :cljs (-> data
+                           goog.crypt/byteArrayToHex
+                           hex-to-base58))
       :bytes  data
       (throw (ex-info "Unsupported output-format"
                       {:data          data
                        :output-format output-format})))))
+
+#?(:clj
+   (defn hex-to-base58
+     "Encodes a hex-string as a base58-string"
+     [data]
+     (assert (hex? data) "Input must be hexadecimal")
+     (-> data
+         DatatypeConverter/parseHexBinary
+         array-to-base58)))
+
+#?(:clj
+   (defn base58-to-hex
+     "Encodes a base58-string as a hex-string"
+     [data]
+     (assert (base58? data) "Input must be in base58")
+     (-> data
+         base58-to-array
+         DatatypeConverter/printHexBinary
+         lower-case)))
