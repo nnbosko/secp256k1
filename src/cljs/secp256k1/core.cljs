@@ -6,11 +6,20 @@
 
   (:refer-clojure :exclude [even?])
   (:require [sjcl]
-            [secp256k1.formatting :refer [add-leading-zero-if-necessary
-                                          DER-encode-ECDSA-signature
-                                          DER-decode-ECDSA-signature]]
-            [secp256k1.math :refer [modular-square-root even? secure-random]]
-            [secp256k1.schema :refer [hex? base58?]]
+            [secp256k1.formatting.der-encoding
+             :refer [
+                     DER-encode-ECDSA-signature
+                     DER-decode-ECDSA-signature]]
+            [secp256k1.math
+             :refer [modular-square-root
+                     even?
+                     secure-random]]
+            [secp256k1.formatting.base-convert
+             :refer [array-to-base
+                     add-leading-zero-if-necessary
+                     base58?
+                     base-to-array
+                     hex?]]
             [goog.math.Integer :as Integer]))
 
 ;;; CONSTANTS
@@ -26,7 +35,6 @@
 (defonce ^:private fifty-eight-chars-string
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
-;; This has to use goog.math.Integer because we need divide
 (let [fifty-eight (Integer/fromInt 58)]
   (defn- hex-to-base58
     "Encodes a hex-string as a base58-string"
@@ -62,27 +70,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defprotocol PrivateKey
-  (private-key [this] [this base]))
-
-(extend-protocol PrivateKey
-  js/sjcl.bn ; Unboxed
-  (private-key
-    [priv-key]
-    (assert (= (.greaterEquals priv-key 1) 1)
-            "Private key should be greater than or equal to 1")
-    (assert (= (.greaterEquals (.-r curve) priv-key) 1)
-            "Private key should be less than or equal to the curve modulus")
-    priv-key)
-
-  string
-  (private-key
-    ;; TODO: Use base here
-    ([this base]
-     (private-key (new js/sjcl.bn this)))
-    ([this]
-     (private-key this :hex))))
-
 (extend-protocol IEquiv
   js/sjcl.bn
   (-equiv [a b]
@@ -100,6 +87,34 @@
            by (.-y b)]
        (and (= ax bx)
             (= ay by))))))
+
+(defprotocol PrivateKey
+  (private-key [this] [this base]))
+
+(extend-protocol PrivateKey
+
+  js/sjcl.bn ; Unboxed
+  (private-key
+    ([priv-key _] (private-key priv-key))
+    ([priv-key]
+     (assert
+      (= (.greaterEquals priv-key 1) 1)
+      "Private key should be greater than or equal to 1")
+     (assert
+      (= (.greaterEquals (.-r curve) priv-key) 1)
+      "Private key should be less than or equal to the curve modulus")
+     priv-key))
+
+  string
+  (private-key
+    ([this base]
+     (-> this
+         (base-to-array base)
+         (array-to-base base)
+         (->> (new js/sjcl.bn))
+         private-key))
+    ([this]
+     (private-key this :hex))))
 
 (defn- valid-point?
   "Predicate to determine if something is a valid ECC point on our curve"
@@ -182,7 +197,8 @@
 
 (defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
-  [pub-key]
+  [pub-key & {:keys [output-format]
+              :or   {output-format :base58}}]
   (let [pub-prefixed (->> pub-key
                           x962-encode
                           js/sjcl.codec.hex.toBits
@@ -206,8 +222,7 @@
     {:created (js/Date.now),
      :priv    priv-key,
      :pub     (public-key priv-key),
-     :sin     (get-sin-from-public-key priv-key)
-     }))
+     :sin     (get-sin-from-public-key priv-key)}))
 
 ;; TODO: Optionally include recovery byte
 (defn sign

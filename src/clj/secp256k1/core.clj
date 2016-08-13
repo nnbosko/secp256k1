@@ -2,8 +2,12 @@
   "ECDSA secp256k1 signatures in Clojure."
 
   (:require [clojure.string :refer [starts-with?]]
-            [secp256k1.schema :refer [hex?]]
             [secp256k1.hashes :refer [sha256 ripemd-160]]
+            [secp256k1.formatting.base-convert
+             :refer [array-to-base
+                     base-to-array
+                     base58?
+                     hex?]]
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.SecureRandom
@@ -34,16 +38,20 @@
 
 (extend-protocol PrivateKey
   (Class/forName "[B")
-  (private-key [data]
-    (private-key (BigInteger. 1 data)))
+  (private-key
+    ([data _]
+     (private-key data))
+    ([data]
+     (private-key (BigInteger. 1 data))))
 
   java.math.BigInteger ; Unboxed
   (private-key
-    [priv-key]
-    (assert (<= 1 priv-key) "Private key should be at least 1")
-    (assert (<= priv-key (.getN curve))
-            "Private key should be less than curve modulus")
-    priv-key)
+    ([priv-key _] (private-key priv-key))
+    ([priv-key]
+     (assert (<= 1 priv-key) "Private key should be at least 1")
+     (assert (<= priv-key (.getN curve))
+             "Private key should be less than curve modulus")
+     priv-key))
 
   clojure.lang.BigInt
   (private-key
@@ -53,10 +61,9 @@
   (private-key
     ([priv-key]
      (private-key priv-key :hex))
-    ;; TODO: Handle base conversion
     ([encoded-key base]
      (-> encoded-key
-         DatatypeConverter/parseHexBinary
+         (base-to-array base)
          private-key))))
 
 (defn- valid-point?
@@ -78,44 +85,44 @@
 (extend-protocol PublicKey
   (Class/forName "[B")
   (public-key
-    [data]
-    (public-key (.decodePoint (.getCurve curve) data)))
+    ([data _] (public-key data))
+    ([data] (public-key (.decodePoint (.getCurve curve) data))))
 
   org.spongycastle.math.ec.ECPoint ; Unboxed
   (public-key
-    [this]
-    (let [point (.normalize this)]
-      (assert (valid-point? point) "Invalid Point")
-      point))
+    ([this _] (public-key this))
+    ([this]
+     (let [point (.normalize this)]
+       (assert (valid-point? point) "Invalid Point")
+       point)))
 
   java.lang.String
   (public-key
-    ([encoded-key]
-     (public-key encoded-key :hex))
-    ;; TODO: handle base conversion
+    ([encoded-key] (public-key encoded-key :hex))
     ([encoded-key base]
-     (-> encoded-key
-         DatatypeConverter/parseHexBinary
-         public-key)))
+     (public-key (base-to-array encoded-key base))))
 
   java.math.BigInteger
   (public-key
-    [this]
-    (-> curve
-        .getG
-        (.multiply (private-key this))
-        .normalize))
+    ([this _] (public-key this))
+    ([this] (-> curve
+                .getG
+                (.multiply (private-key this))
+                .normalize)))
 
   clojure.lang.BigInt
   (public-key
-    [this]
-    (public-key (private-key this))))
+    ([this _] (public-key this))
+    ([this] (public-key (private-key this)))))
 
+;; TODO: Test input and output formats
 (defn x962-encode
   "Encode a public key as hex using X9.62 compression"
-  [pub-key & {:keys [compressed]
-              :or   {compressed true}}]
-  (let [point (public-key pub-key)
+  [pub-key & {:keys [compressed output-format input-format]
+              :or   {compressed true
+                     input-format :hex
+                     output-format :hex}}]
+  (let [point (public-key pub-key input-format)
         x (-> point .getXCoord .toBigInteger)
         y (-> point .getYCoord .toBigInteger)]
     (-> curve
@@ -123,51 +130,23 @@
         (.createPoint x y compressed)
         .normalize
         .getEncoded
-        DatatypeConverter/printHexBinary
-        .toLowerCase)))
+        (array-to-base output-format))))
 
-(defn get-public-key-from-private-key
-  "Generate a public key from a private key"
-  [priv-key & {:keys [compressed]
-               :or {compressed true}}]
-  (-> priv-key
-      private-key
-      public-key
-      (x962-encode :compressed compressed)))
-
-(defonce ^:private ^:const fifty-eight-chars-string
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
-
-(defn- hex-to-base58
-  "Encodes a hex-string as a base58-string"
-  [input]
-  (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
-    (loop [acc [], n (BigInteger. input 16)]
-      (if (pos? n)
-        (let [i (rem n 58)
-              s (nth fifty-eight-chars-string i)]
-          (recur (cons s acc) (quot n 58)))
-        (apply str (concat
-                    (repeat leading-zeros (first fifty-eight-chars-string))
-                    acc))))))
-
+;; TODO: Switch this to make BitCoin addresses
 (defn get-sin-from-public-key
   "Generate a SIN from a public key"
-  [pub-key]
-  (let [pub-prefixed (->> pub-key
-                          x962-encode
-                          DatatypeConverter/parseHexBinary
+  [pub-key & {:keys [output-format]
+              :or   {output-format :base58}}]
+  (let [pub-prefixed (-> pub-key
+                         (x962-encode :output-format :bytes)
+                         sha256
+                         ripemd-160
+                         (->> (concat [0x0F 0x02])))
+        checksum     (->> pub-prefixed
                           sha256
-                          ripemd-160
-                          DatatypeConverter/printHexBinary .toLowerCase
-                          (str "0f02"))
-        checksum     (-> pub-prefixed
-                         DatatypeConverter/parseHexBinary
-                         sha256
-                         sha256
-                         DatatypeConverter/printHexBinary .toLowerCase
-                         (subs 0 8))]
-    (hex-to-base58 (str pub-prefixed checksum))))
+                          sha256
+                          (take 4))]
+    (array-to-base (concat pub-prefixed checksum) output-format)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -184,7 +163,7 @@
         pub-key (public-key priv-key)]
     {:created (System/currentTimeMillis),
      :priv priv-key,
-     :pub (public-key priv-key),
+     :pub pub-key,
      :sin (get-sin-from-public-key pub-key)}))
 
 (defn sign
@@ -207,6 +186,7 @@
         DatatypeConverter/printHexBinary
         .toLowerCase)))
 
+;; TODO: key, data, and hex signature need formats
 (defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
   [key, input, hex-signature]
@@ -221,6 +201,7 @@
             s (-> sequence (.getObjectAt 1) .getValue)]
         (.verifySignature verifier input r s)))))
 
+;; TODO: key, data, and hex signature need formats
 (defn verify-signature
   "Verifies that a string of data has been signed"
   [key data hex-signature]
@@ -232,34 +213,16 @@
      (verify key (sha256 data) hex-signature)
      (catch Exception _ false))))
 
-(defn-
-  base58-to-hex
-  "Encodes a base58-string as a hex-string"
-  [s]
-  (let [padding (->> s
-                     (take-while #(= % (first fifty-eight-chars-string)))
-                     (map (constantly (byte 0))))]
-    (loop [result 0, s s]
-      (if-not (empty? s)
-        (recur (+ (*' result 58)
-                  (.indexOf fifty-eight-chars-string (str (first s))))
-               (rest s))
-        (->> result
-             str
-             java.math.BigInteger.
-             .toByteArray
-             (drop-while zero?)
-             (concat padding)
-             byte-array
-             DatatypeConverter/printHexBinary .toLowerCase)))))
 
 (defn validate-sin
   "Verify that a SIN is valid"
   [sin]
   (try
     (and (string? sin)
-         (clojure.set/subset? (set sin) (set fifty-eight-chars-string))
-         (let [pub-with-checksum (base58-to-hex sin)
+         (base58? sin)
+         (let [pub-with-checksum (-> sin
+                                     (base-to-array :base58)
+                                     (array-to-base :hex))
                len               (count pub-with-checksum)
                expected-checksum (-> pub-with-checksum (subs (- len 8) len))
                actual-checksum   (-> pub-with-checksum

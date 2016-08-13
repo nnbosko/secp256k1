@@ -1,13 +1,10 @@
-(ns secp256k1.formatting
-  "An implementation of the Distinguished Encoding Rules for ECDSA signatures, using hexadecimal strings, and other formatting utilities.
+(ns secp256k1.formatting.der-encoding
+  "A (simplified) implementation of the Distinguished Encoding Rules for ECDSA signatures,
+  using hexadecimal strings, and other formatting utilities.
 
   https://en.wikipedia.org/wiki/X.690#DER_encoding"
-  (:require [secp256k1.schema :refer [hex?]]))
-
-(defn add-leading-zero-if-necessary
-  "Adds a leading zero to a hex string if it is of odd length"
-  [s]
-  (if (odd? (count s)) (str "0" s) s))
+  (:require [secp256k1.formatting.base-convert
+             :refer [hex? add-leading-zero-if-necessary]]))
 
 (defn- encode-asn1-length
   [len]

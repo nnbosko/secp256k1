@@ -1,15 +1,12 @@
 (ns secp256k1.core-test
   (:require [secp256k1.core :as secp256k1]
-            [secp256k1.hashes :as hashes]
             #?(:cljs [sjcl])
             #?(:clj  [clojure.test
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
                :cljs [cljs.test
-                      :refer-macros [is use-fixtures
-                                     testing are run-tests]])
-            #?(:cljs [devcards.core :refer-macros [deftest]]))
-  #?(:clj (:import javax.xml.bind.DatatypeConverter)))
+                      :refer-macros [is use-fixtures testing are]])
+            #?(:cljs [devcards.core :refer-macros [deftest]])))
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
@@ -152,18 +149,6 @@
       (is (= pub-key (secp256k1/public-key priv-key))
           "Public key k1 corresponds to private key")
       (is (= sin (secp256k1/get-sin-from-public-key pub-key))))))
-
-#?(:clj
-   (deftest hmac-SHA256
-     (testing "Returns the right result for reference HMAC-SHA256 values from wikipedia: https://en.wikipedia.org/wiki/Hash-based_message_authentication_code#Examples"
-       (is (= "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"
-              (-> (hashes/hmac-sha256 "" "")
-                  DatatypeConverter/printHexBinary .toLowerCase)))
-       (is (= "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
-              (-> (hashes/hmac-sha256
-                   "key"
-                   "The quick brown fox jumps over the lazy dog")
-                  DatatypeConverter/printHexBinary .toLowerCase))))))
 
 (deftest x962-encode-decode
   (testing "x962-encode is idempotent on compressed keys"

@@ -1,7 +1,8 @@
 (ns secp256k1.math
   (:refer-clojure :exclude [even?])
   (:require [sjcl]
-            [secp256k1.formatting :refer [add-leading-zero-if-necessary]]
+            [secp256k1.formatting.base-convert
+             :refer [add-leading-zero-if-necessary]]
             [goog.array :refer [toArray]])
   (:import [secp256k1.math.random Isaac]))
 
