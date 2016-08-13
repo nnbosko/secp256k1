@@ -18,12 +18,15 @@
   clojure.lang.Sequential (to-bytes [ba] (byte-array ba)))
 
 (defn sha256
-  "Get the SHA256 hash of a byte-array"
-  [data]
-  (-> (MessageDigest/getInstance "SHA-256")
-      (.digest (to-bytes data))))
+  "Get the SHA256 hash and return a byte-array"
+  [& data]
+  (let [d (MessageDigest/getInstance "SHA-256")]
+    (doseq [datum data]
+      (.update d (to-bytes datum)))
+    (.digest d)))
 
-;; Use spongycastle/bouncycastle because javax.crypto.Mac doesn't support empty keys
+;; Use spongycastle/bouncycastle because javax.crypto.Mac
+;; doesn't support empty keys (one of the standard test vectors)
 (defn hmac-sha256
   "Compute the HMAC given a private key and data using SHA256"
   [k data]
