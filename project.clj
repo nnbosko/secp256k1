@@ -33,7 +33,7 @@
      :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :figwheel {:devcards true}
      :compiler
-     {:main "secp256k1.devcards"
+     {:main "secp256k1.tester"
       :asset-path "js/compiled/devcards_out"
       :output-to "dev-resources/public/js/compiled/secp256k1_devcards.js"
       :output-dir "dev-resources/public/js/compiled/devcards_out"

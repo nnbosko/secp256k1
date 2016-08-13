@@ -40,13 +40,13 @@
      :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :compiler
      {:output-to     "target/js/compiled/testable.js"
-      :main          "secp256k1.test-runner"
+      :main          "secp256k1.tester"
       :optimizations :whitespace}}
     {:id           "test-advanced"
      :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :compiler
      {:output-to     "target/js/compiled/testable.min.js"
-      :main          "secp256k1.test-runner"
+      :main          "secp256k1.tester"
       :optimizations :advanced
       :pretty-print  false}}]}
 
