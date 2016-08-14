@@ -41,9 +41,12 @@
 
 (defn ripemd-160
   "Get the ripemd-160 hash"
-  [data]
-  (let [data (to-bytes data)
-        d (doto (RIPEMD160Digest.) (.update data 0 (count data)))
+  [& data]
+  (let [d (RIPEMD160Digest.)
         o (byte-array (.getDigestSize d))]
-    (.doFinal d o 0)
-    o))
+    (doseq [datum data]
+      (let [datum (to-bytes datum)]
+        (.update d datum 0 (count datum))))
+    (let [o (byte-array (.getDigestSize d))]
+      (.doFinal d o 0)
+      o)))
