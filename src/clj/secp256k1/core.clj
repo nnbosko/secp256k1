@@ -4,14 +4,14 @@
   (:require [clojure.string :refer [starts-with?]]
             [secp256k1.hashes :refer [sha256 ripemd-160]]
             [secp256k1.formatting.base-convert
-             :refer [array-to-base
-                     base-to-array
+             :refer [byte-array-to-base
+                     base-to-byte-array
+                     base-to-base
                      base58?
                      hex?]]
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.SecureRandom
-           javax.xml.bind.DatatypeConverter
            org.spongycastle.asn1.ASN1InputStream
            org.spongycastle.asn1.ASN1Integer
            org.spongycastle.asn1.DERSequenceGenerator
@@ -63,7 +63,7 @@
      (private-key priv-key :hex))
     ([encoded-key base]
      (-> encoded-key
-         (base-to-array base)
+         (base-to-byte-array base)
          private-key))))
 
 (defn- valid-point?
@@ -100,7 +100,7 @@
   (public-key
     ([encoded-key] (public-key encoded-key :hex))
     ([encoded-key base]
-     (public-key (base-to-array encoded-key base))))
+     (public-key (base-to-byte-array encoded-key base))))
 
   java.math.BigInteger
   (public-key
@@ -130,7 +130,7 @@
         (.createPoint x y compressed)
         .normalize
         .getEncoded
-        (array-to-base output-format))))
+        (byte-array-to-base output-format))))
 
 ;; TODO: Switch this to make BitCoin addresses
 (defn get-sin-from-public-key
@@ -146,7 +146,7 @@
                           sha256
                           sha256
                           (take 4))]
-    (array-to-base (concat pub-prefixed checksum) output-format)))
+    (byte-array-to-base (concat pub-prefixed checksum) output-format)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -183,8 +183,7 @@
         (.addObject (ASN1Integer. (get sigs 1)))))
     (-> bos
         .toByteArray
-        DatatypeConverter/printHexBinary
-        .toLowerCase)))
+        (byte-array-to-base :hex))))
 
 ;; TODO: key, data, and hex signature need formats
 (defn- verify
@@ -193,7 +192,7 @@
   (let [spongy-pub-key (-> key
                            public-key
                            (ECPublicKeyParameters. curve))
-        signature (DatatypeConverter/parseHexBinary hex-signature)
+        signature (base-to-byte-array hex-signature :hex)
         verifier (doto (ECDSASigner.) (.init false spongy-pub-key))]
     (with-open [decoder (ASN1InputStream. signature)]
       (let [sequence (.readObject decoder)
@@ -216,22 +215,23 @@
 
 (defn validate-sin
   "Verify that a SIN is valid"
-  [sin]
+  [sin & {:keys [input-format]
+          :or   {input-format :base58}}]
   (try
-    (and (string? sin)
-         (base58? sin)
-         (let [pub-with-checksum (-> sin
-                                     (base-to-array :base58)
-                                     (array-to-base :hex))
-               len               (count pub-with-checksum)
-               expected-checksum (-> pub-with-checksum (subs (- len 8) len))
-               actual-checksum   (-> pub-with-checksum
-                                     (subs 0 (- len 8))
-                                     DatatypeConverter/parseHexBinary
-                                     sha256
-                                     sha256
-                                     DatatypeConverter/printHexBinary .toLowerCase
-                                     (subs 0 8))]
-           (and (clojure.string/starts-with? pub-with-checksum "0f02")
-                (= expected-checksum actual-checksum))))
-    (catch Exception _ false)))
+    (let [pub-with-checksum (base-to-byte-array sin input-format)
+          len               (count pub-with-checksum)
+          expected-checksum (->> pub-with-checksum (drop 22) vec)
+          actual-checksum   (->> pub-with-checksum
+                                 (take 22)
+                                 sha256
+                                 sha256
+                                 (take 4)
+                                 vec)
+          prefix            (->> pub-with-checksum
+                                 (take 2)
+                                 vec)]
+      (and
+       (= len 26)
+       (= prefix [0x0f 0x02])
+       (= expected-checksum actual-checksum)))
+    (catch Throwable _ false)))
