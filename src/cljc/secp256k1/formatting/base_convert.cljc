@@ -87,21 +87,34 @@
                (->> (concat padding)
                     (apply str))))))))
 
+#?(:cljs
+   (defn bytes? [x]
+     "Predicate to determine that whether something is an unsigned sequence of bytes"
+     (and (or (implements? ISeqable x) (array? x))
+          (every? int? x)
+          (every? #(and (<= 0 %) (<= % 255))
+                  (map #(unsigned-bit-shift-right % 0) x)))))
+
 (defn base-to-array
-  [data base]
-  (case base
+  [data format]
+  (case format
     :hex   #?(:clj  (DatatypeConverter/parseHexBinary data)
-              :cljs (goog.crypt/hexToByteArray data))
+              :cljs (do
+                      (assert (hex? data) "Input must be in hexadecimal")
+                      (goog.crypt/hexToByteArray data)))
     :base64 #?(:clj (DatatypeConverter/parseBase64Binary data)
                :cljs (goog.crypt.base64/decodeStringToByteArray data))
     :base58 #?(:clj  (base58-to-array data)
                :cljs (-> data
                          base58-to-hex
                          goog.crypt/hexToByteArray))
-    (throw (ex-info "Unsupported base"
+    :bytes  #?(:clj (byte-array data)
+               :cljs (do (assert (bytes? data)
+                                 "Argument must be a byte array")
+                         (clj->js data)) )
+    (throw (ex-info "Unsupported format"
                     {:data data
-                     :base base}))))
-
+                     :format format}))))
 
 #?(:clj
    (defn- array-to-base58
@@ -134,14 +147,6 @@
              (apply str (concat
                          (repeat leading-zeros (first base-fifty-eight-chars))
                          acc))))))))
-
-#?(:cljs
-   (defn bytes? [x]
-     "Predicate to determine that whether something is an unsigned sequence of bytes"
-     (and (or (implements? ISeqable x) (array? x))
-          (every? int? x)
-          (every? (partial <= 0) x)
-          (every? (partial >= 255) x))))
 
 (defn array-to-base
   [data output-format]
@@ -182,3 +187,23 @@
          base58-to-array
          DatatypeConverter/printHexBinary
          lower-case)))
+
+(defn base-to-base
+  "Convert one base into another"
+  [data input-format output-format]
+  (cond
+    (= input-format output-format)
+    data
+
+    (= [:base58 :hex]
+       [input-format output-format])
+    (base58-to-hex data)
+
+    (= [:hex :base58]
+       [input-format output-format])
+    (hex-to-base58 data)
+
+    :else
+    (-> data
+        (base-to-array input-format)
+        (array-to-base output-format))))
