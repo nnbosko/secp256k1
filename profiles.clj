@@ -53,8 +53,8 @@
   :aliases
   {"test-advanced"       ["do"
                           "clean,"
-                          "npm" "install,"
                           "test,"
+                          "npm" "install,"
                           "doo" "all" "test" "once,"
                           "doo" "all" "test-advanced" "once,"]
    "advanced-test"       ["test-advanced"]
