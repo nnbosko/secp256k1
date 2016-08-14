@@ -5,8 +5,24 @@
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
                :cljs [cljs.test
-                      :refer-macros [is use-fixtures testing are]])
-            #?(:cljs [devcards.core :refer-macros [deftest]])))
+                      :refer [is use-fixtures testing are]])
+            #?(:cljs [devcards.core
+                      :refer [defcard deftest]])))
+
+#?(:cljs
+   (defcard x962-encode-performance
+     "Parse and x962-encode a private key"
+     (with-out-str
+       (time (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+                 secp256k1/private-key
+                 secp256k1/x962-encode)))))
+
+#?(:cljs
+   (defcard x962-decode-performance
+     "Decode a compressed x962-encoded public key"
+     (with-out-str
+       (time (-> "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+                 secp256k1/public-key)))))
 
 (deftest get-public-key-from-private-key-with-leading-zero
   (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
@@ -14,11 +30,35 @@
              secp256k1/private-key
              secp256k1/x962-encode))
       "Public key should start with a leading zero")
+(is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             secp256k1/private-key
+             secp256k1/x962-encode
+             secp256k1/public-key
+             secp256k1/x962-encode))
+      "Public key should be recoverable from encoded key")
+  (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             (secp256k1/private-key :hex)
+             secp256k1/x962-encode))
+      "Public key should start with a leading zero (explicit hex encoding)")
+  (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             (secp256k1/private-key :hex)
+             secp256k1/public-key
+             secp256k1/x962-encode))
+      "Public key should start with a leading zero (explicit coercing to public-key)")
+  (is (= "0200bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1"
+         (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
+             (secp256k1/private-key :hex)
+             (secp256k1/public-key :not-used)
+             secp256k1/x962-encode))
+      "Public key should start with a leading zero (explicit coercion to public key with unused base argument)")
   (is (= "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
          (-> "c6b7f6bfe5bb19b1e390e55ed4ba5df8af6068d0eb89379a33f9c19aacf6c08c"
              secp256k1/private-key
              (secp256k1/x962-encode :compressed false)))
-      "Public key should start with a leading zero"))
+      "Public key should start with a leading zero (uncompressed)"))
 
 (deftest public-private-key-equality
   (testing "Checking that equality works for private-keys"
