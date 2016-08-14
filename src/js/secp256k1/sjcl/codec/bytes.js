@@ -67,7 +67,7 @@ secp256k1.sjcl.codec.bytes.fromBits = function(arr) {
  * @return {Array<number>} An array of signed 32 bit words representing the input.
  */
 secp256k1.sjcl.codec.bytes.toBits = function(bytes) {
-    var out = new Array(bytes.length / 4), i, j = 0, tmp=0;
+    var out = new Array(Math.ceil(bytes.length / 4)), i, j = 0, tmp=0;
     for (i=0; i<bytes.length; i++) {
       tmp = tmp << 8 | bytes[i];
       if ((i&3) === 3) {
