@@ -7,8 +7,7 @@
   (:refer-clojure :exclude [even?])
   (:require [sjcl]
             [secp256k1.formatting.der-encoding
-             :refer [
-                     DER-encode-ECDSA-signature
+             :refer [DER-encode-ECDSA-signature
                      DER-decode-ECDSA-signature]]
             [secp256k1.math
              :refer [modular-square-root
@@ -16,11 +15,17 @@
                      secure-random]]
             [secp256k1.formatting.base-convert
              :refer [array-to-base
-                     add-leading-zero-if-necessary
+                     base-to-base
                      base58?
-                     base-to-array
                      hex?]]
-            [goog.math.Integer :as Integer]))
+            [secp256k1.hashes :refer [sha256]]
+            [goog.math.Integer :as Integer]
+            [goog.crypt :refer [hexToByteArray byteArrayToHex]]
+            [secp256k1.sjcl.bitArray :as bitArray]
+            [secp256k1.sjcl.codec.bytes :as bytes]
+            [secp256k1.sjcl.hash.ripemd160 :as ripemd160]
+            [secp256k1.sjcl.codec.hex :as hex]
+            [secp256k1.sjcl.codec.utf8String :as utf8String]))
 
 ;;; CONSTANTS
 
@@ -28,45 +33,6 @@
   ^:private
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve js/sjcl.ecc.curves.k256)
-
-;; Move to some library for bases
-;;; UTILITY FUNCTIONS
-
-(defonce ^:private fifty-eight-chars-string
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
-
-(let [fifty-eight (Integer/fromInt 58)]
-  (defn- hex-to-base58
-    "Encodes a hex-string as a base58-string"
-    [input]
-    (let [leading-zeros (->> input (partition 2) (take-while #(= % '(\0 \0))) count)]
-      (loop [acc [],
-             n (Integer/fromString input 16)]
-        (if-not (.isZero n)
-          (let [i (-> n (.modulo fifty-eight) .toInt)
-                s (nth fifty-eight-chars-string i)]
-            (recur (cons s acc) (.divide n fifty-eight)))
-          (apply str (concat
-                      (repeat leading-zeros (first fifty-eight-chars-string))
-                      acc)))))))
-
-(defn- base58-to-hex
-  "Encodes a base58-string as a hex-string"
-  [s]
-  (let [padding (->> s
-                     (take-while #(= % (first fifty-eight-chars-string)))
-                     (mapcat (constantly "00")))]
-    (loop [result (new js/sjcl.bn 0), s s]
-      (if-not (empty? s)
-        (recur (.add (.mul result 58)
-                     (.indexOf fifty-eight-chars-string (first s)))
-               (rest s))
-        (-> result
-            .toBits
-            js/sjcl.codec.hex.fromBits
-            add-leading-zero-if-necessary
-            (->> (concat padding)
-                 (apply str)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -109,8 +75,7 @@
   (private-key
     ([this base]
      (-> this
-         (base-to-array base)
-         (array-to-base base)
+         (base-to-base base :hex)
          (->> (new js/sjcl.bn))
          private-key))
     ([this]
@@ -134,66 +99,82 @@
 (defprotocol PublicKey
   (public-key [this] [this base]))
 
+(defn- x962-decode
+  "Decode a x962-encoded public key from a hexadecimal string.
+
+  Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188"
+  [encoded-key]
+  (cond
+    (and (#{"02" "03"} (subs encoded-key 0 2))
+         (= 66 (count encoded-key)))
+    (let [x           (-> encoded-key
+                          (subs 2 66)
+                          (->> (new js/sjcl.bn)))
+          y-even?     (= (subs encoded-key 0 2) "02")
+          modulus     (-> curve .-field .-modulus)
+          ;; √(x * (a + x**2) + b) % p
+          y-candidate (modular-square-root
+                       (.add
+                        (.mul x (.add (.-a curve) (.square x)))
+                        (.-b curve))
+                       modulus)
+          y          (if (= y-even? (even? y-candidate))
+                       y-candidate
+                       (.sub modulus y-candidate))]
+      (public-key
+       (new js/sjcl.ecc.point curve x y)))
+
+    (and (= "04" (subs encoded-key 0 2))
+         (= 130 (count encoded-key)))
+    (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
+          y (-> encoded-key (subs 66) (->> (new js/sjcl.bn)))]
+      (public-key
+       (new js/sjcl.ecc.point curve x y)))
+
+    :else
+    (throw (ex-info "Cannot handle encoded public key"
+                    {:encoded-key encoded-key}))))
+
 (extend-protocol PublicKey
   js/sjcl.ecc.point ; Unboxed
-  (public-key [point]
-    (assert (valid-point? point) "Invalid point")
-    point)
+  (public-key
+    ([point _]
+     (public-key point))
+    ([point]
+     (assert (valid-point? point) "Invalid point")
+     point))
 
   string
   (public-key
-    ;; TODO: Use base here
     ([encoded-key base]
-     ;; Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188
-     (cond
-       (and (#{"02" "03"} (subs encoded-key 0 2))
-            (= 66 (count encoded-key)))
-       (let [x           (-> encoded-key
-                             (subs 2 66)
-                             (->> (new js/sjcl.bn)))
-             y-even?     (= (subs encoded-key 0 2) "02")
-             modulus     (-> curve .-field .-modulus)
-             ;; √(x * (a + x**2) + b) % p
-             y-candidate (modular-square-root
-                          (.add
-                           (.mul x (.add (.-a curve) (.square x)))
-                           (.-b curve))
-                          modulus)
-             y          (if (= y-even? (even? y-candidate))
-                          y-candidate
-                          (.sub modulus y-candidate))]
-         (public-key
-          (new js/sjcl.ecc.point curve x y)))
+     (-> encoded-key
+         (base-to-base base :hex)
+         x962-decode))
 
-       (= "04" (subs encoded-key 0 2))
-       (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
-             y (-> encoded-key (subs 66) (->> (new js/sjcl.bn)))]
-         (public-key
-          (new js/sjcl.ecc.point curve x y)))
-
-       :else
-       (throw (ex-info "Cannot handle encoded public key"
-                       {:encoded-key encoded-key}))))
-
-    ([this]
-     (assert (hex? this) "Argument must be hexadecimal")
-     (public-key this :hex)))
+    ([this] (public-key this :hex)))
 
   js/sjcl.bn
-  (public-key [priv-key]
-    (.mult (.-G curve) (private-key priv-key))))
+  (public-key
+    ([priv-key _] (public-key priv-key))
+    ([priv-key]
+     (.mult (.-G curve) (private-key priv-key)))))
 
 ;; TODO: Allow for Base58/Base64
 (defn x962-encode
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
-  [pub-key & {:keys [compressed]
-              :or   {compressed true}}]
-  (let [point (public-key pub-key)
-        x     (-> point .-x .toBits js/sjcl.codec.hex.fromBits)]
-    (if compressed
-      (str (if (-> point .-y even?) "02" "03") x)
-      (let [y (-> point .-y .toBits js/sjcl.codec.hex.fromBits)]
-        (str "04" x y)))))
+  [pub-key &
+   {:keys [compressed output-format input-format]
+    :or   {compressed true
+           input-format :hex
+           output-format :hex}}]
+  (let [point (public-key pub-key input-format)
+        x     (-> point .-x .toBits hex/fromBits)]
+    (->
+     (if compressed
+       (str (if (-> point .-y even?) "02" "03") x)
+       (let [y (-> point .-y .toBits hex/fromBits)]
+         (str "04" x y)))
+     (base-to-base :hex output-format))))
 
 (defn get-sin-from-public-key
   "Generate a SIN from a compressed public key"
@@ -201,19 +182,19 @@
               :or   {output-format :base58}}]
   (let [pub-prefixed (->> pub-key
                           x962-encode
-                          js/sjcl.codec.hex.toBits
-                          js/sjcl.hash.sha256.hash
-                          js/sjcl.hash.ripemd160.hash
-                          js/sjcl.codec.hex.fromBits
+                          hexToByteArray
+                          sha256
+                          ripemd160/hash
+                          byteArrayToHex
                           (str "0f02"))
         checksum     (->  pub-prefixed
-                          js/sjcl.codec.hex.toBits
-                          js/sjcl.hash.sha256.hash
-                          js/sjcl.hash.sha256.hash
-                          js/sjcl.codec.hex.fromBits
+                          hexToByteArray
+                          sha256
+                          sha256
+                          byteArrayToHex
                           (subs 0 8))]
     (-> (str pub-prefixed checksum)
-        hex-to-base58)))
+        (base-to-base :hex output-format))))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -231,9 +212,9 @@
   (let [d    (private-key priv-key)
         n    (.-r curve)
         l    (.bitLength n)
-        hash (js/sjcl.hash.sha256.hash data)
-        z    (-> (if (> (js/sjcl.bitArray.bitLength hash) l)
-                   (js/sjcl.bitArray.clamp hash l)
+        hash (-> data sha256 bytes/toBits)
+        z    (-> (if (> (bitArray/bitLength hash) l)
+                   (bitArray/clamp hash l)
                    hash)
                  js/sjcl.bn.fromBits)]
     (loop []
@@ -245,8 +226,8 @@
               (.equals s 0) (recur)
               :else
               (DER-encode-ECDSA-signature
-               :R (-> r (.toBits l) js/sjcl.codec.hex.fromBits)
-               :S (-> s (.toBits l) js/sjcl.codec.hex.fromBits)))))))
+               :R (-> r (.toBits l) hex/fromBits)
+               :S (-> s (.toBits l) hex/fromBits)))))))
 
 ;; TODO: Support Base58 encoding
 (defn verify-signature
@@ -259,14 +240,13 @@
    (try
      (let [{r-hex :R,
             s-hex :S} (DER-decode-ECDSA-signature hex-signature)
-           pub-key    (if (instance? js/sjcl.ecc.point key)
-                        key
-                        (public-key key))
+           pub-key    (public-key key)
            n          (.-r curve)
            r          (-> (new js/sjcl.bn r-hex) (.mod n))
            s-inv      (-> (new js/sjcl.bn s-hex) (.inverseMod n))
            z          (-> data
-                          js/sjcl.hash.sha256.hash
+                          sha256
+                          bytes/toBits
                           js/sjcl.bn.fromBits
                           (.mod n))
            u1         (-> z
@@ -284,16 +264,16 @@
   [sin]
   (try
     (and (string? sin)
-         (clojure.set/subset? (set sin) (set fifty-eight-chars-string))
-         (let [pub-with-checksum (base58-to-hex sin)
+         (base58? sin)
+         (let [pub-with-checksum (base-to-base sin :base58 :hex)
                len               (count pub-with-checksum)
                expected-checksum (-> pub-with-checksum (subs (- len 8) len))
                actual-checksum   (-> pub-with-checksum
                                      (subs 0 (- len 8))
-                                     js/sjcl.codec.hex.toBits
-                                     js/sjcl.hash.sha256.hash
-                                     js/sjcl.hash.sha256.hash
-                                     js/sjcl.codec.hex.fromBits
+                                     hexToByteArray
+                                     sha256
+                                     sha256
+                                     byteArrayToHex
                                      (subs 0 8))]
            (and (clojure.string/starts-with? pub-with-checksum "0f02")
                 (= expected-checksum actual-checksum))))
