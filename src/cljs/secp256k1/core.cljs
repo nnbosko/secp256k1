@@ -14,18 +14,16 @@
                      even?
                      secure-random]]
             [secp256k1.formatting.base-convert
-             :refer [array-to-base
+             :refer [base-to-byte-array
                      base-to-base
+                     byte-array-to-base
                      base58?
                      hex?]]
-            [secp256k1.hashes :refer [sha256]]
+            [secp256k1.hashes :refer [sha256 ripemd-160 to-bytes]]
             [goog.math.Integer :as Integer]
-            [goog.crypt :refer [hexToByteArray byteArrayToHex]]
             [secp256k1.sjcl.bitArray :as bitArray]
             [secp256k1.sjcl.codec.bytes :as bytes]
-            [secp256k1.sjcl.hash.ripemd160 :as ripemd160]
-            [secp256k1.sjcl.codec.hex :as hex]
-            [secp256k1.sjcl.codec.utf8String :as utf8String]))
+            [secp256k1.sjcl.codec.hex :as hex]))
 
 ;;; CONSTANTS
 
@@ -33,8 +31,6 @@
   ^:private
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve js/sjcl.ecc.curves.k256)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (extend-protocol IEquiv
   js/sjcl.bn
@@ -159,7 +155,6 @@
     ([priv-key]
      (.mult (.-G curve) (private-key priv-key)))))
 
-;; TODO: Allow for Base58/Base64
 (defn x962-encode
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
   [pub-key &
@@ -176,25 +171,21 @@
          (str "04" x y)))
      (base-to-base :hex output-format))))
 
+;; TODO: Switch to bitcoin addresses, use SJCL to keep stuff DRY, use different input bases
 (defn get-sin-from-public-key
-  "Generate a SIN from a compressed public key"
+  "Generate a SIN from a public key"
   [pub-key & {:keys [output-format]
               :or   {output-format :base58}}]
-  (let [pub-prefixed (->> pub-key
-                          x962-encode
-                          hexToByteArray
-                          sha256
-                          ripemd160/hash
-                          byteArrayToHex
-                          (str "0f02"))
-        checksum     (->  pub-prefixed
-                          hexToByteArray
+  (let [pub-prefixed (-> pub-key
+                         (x962-encode :output-format :bytes)
+                         sha256
+                         ripemd-160
+                         (->> (concat [0x0F 0x02])))
+        checksum     (->> pub-prefixed
                           sha256
                           sha256
-                          byteArrayToHex
-                          (subs 0 8))]
-    (-> (str pub-prefixed checksum)
-        (base-to-base :hex output-format))))
+                          (take 4))]
+    (byte-array-to-base (concat pub-prefixed checksum) output-format)))
 
 (defn generate-sin
   "Generate a new private key, new public key, SIN and timestamp"
@@ -261,20 +252,23 @@
 
 (defn validate-sin
   "Verify that a SIN is valid"
-  [sin]
+  [sin & {:keys [input-format]
+          :or   {input-format :base58}}]
   (try
-    (and (string? sin)
-         (base58? sin)
-         (let [pub-with-checksum (base-to-base sin :base58 :hex)
-               len               (count pub-with-checksum)
-               expected-checksum (-> pub-with-checksum (subs (- len 8) len))
-               actual-checksum   (-> pub-with-checksum
-                                     (subs 0 (- len 8))
-                                     hexToByteArray
-                                     sha256
-                                     sha256
-                                     byteArrayToHex
-                                     (subs 0 8))]
-           (and (clojure.string/starts-with? pub-with-checksum "0f02")
-                (= expected-checksum actual-checksum))))
+    (let [pub-with-checksum (base-to-byte-array sin input-format)
+          len               (count pub-with-checksum)
+          expected-checksum (->> pub-with-checksum (drop 22) vec)
+          actual-checksum   (->> pub-with-checksum
+                                 (take 22)
+                                 sha256
+                                 sha256
+                                 (take 4)
+                                 vec)
+          prefix            (->> pub-with-checksum
+                                 (take 2)
+                                 vec)]
+      (and
+       (= len 26)
+       (= prefix [0x0f 0x02])
+       (= expected-checksum actual-checksum)))
     (catch js/Error _ false)))
