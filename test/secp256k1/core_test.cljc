@@ -355,7 +355,7 @@
 
 (deftest sin-tests
   (testing "Reference sins are valid"
-    (are [x] (secp256k1/validate-sin x)
+    (are [x] (= (secp256k1/validate-sin x) true)
       "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
       "TfGVzWqwft6fFdLzy8vR7qFTT77N7aTqa4n"
       "Tf4Lo9zAU73ezP7LKc3njaK5pez7oVhzH2H"
@@ -365,7 +365,7 @@
       "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))
 
   (testing "Ill-formatted sins are invalid"
-    (are [x] (not (secp256k1/validate-sin x))
+    (are [x] (= (secp256k1/validate-sin x) false)
       7
       (constantly :foo)
       :bar
