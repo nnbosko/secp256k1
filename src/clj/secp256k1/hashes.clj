@@ -10,6 +10,7 @@
    org.spongycastle.crypto.signers.ECDSASigner))
 
 (defprotocol ByteSerializable
+  "Serialize data into a byte array"
   (to-bytes [this]))
 
 (extend-protocol ByteSerializable
