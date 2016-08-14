@@ -19,11 +19,13 @@
   (let [modulus (new js/sjcl.bn modulus)
         n       (.mod (new js/sjcl.bn n) modulus)
         mod8    (-> modulus (.mod 8) .toString js/parseInt)]
-    (assert (= (.greaterEquals n 2) 1),
-            "Argument must be greater than or equal to 2")
     (assert (= (.greaterEquals modulus 0) 1),
             "Modulus must be non-negative")
     (cond
+      (.equals n 0) n
+
+      (.equals n 1) n
+
       ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_equal_to_2
       (.equals modulus 2)
       (.mod n modulus)
@@ -109,7 +111,7 @@
       (->>
        (repeatedly (/ byte-count 4) #(.rand rng))
        (mapcat #(for [i (range 4)]
-                  (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))) )
+                  (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))))
        clj->js))))
 
 (defn secure-random
