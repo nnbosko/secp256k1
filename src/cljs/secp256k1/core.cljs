@@ -1,8 +1,5 @@
 (ns secp256k1.core
-  "A ClojureScript implementation of ECDSA signatures with secp256k1
-
-   https://github.com/bitpay/secp256k1
-   http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
+  "A ClojureScript implementation of ECDSA signatures with secp256k1"
 
   (:refer-clojure :exclude [even?])
   (:require [sjcl]
@@ -64,7 +61,8 @@
 
 (extend-protocol PrivateKey
 
-  bn                                                        ; Unboxed
+  ;; Unboxed
+  bn
   (private-key
     ([priv-key _] (private-key priv-key))
     ([priv-key]
@@ -90,17 +88,10 @@
 (defn- valid-point?
   "Predicate to determine if something is a valid ECC point on our curve"
   [point]
-  (and (instance? ECPoint point)
-    (let [x       (.-x point)
-          y       (.-y point)
-          a       (.-a curve)
-          b       (.-b curve)
-          modulus (-> curve .-field .-modulus)]
-      (and
-        (instance? bn x)
-        (instance? bn y)
-        (= (.mod (.add (.mul x (.add a (.square x))) b) modulus)
-          (.mod (.square y) modulus))))))
+  (and
+    (instance? ECPoint point)
+    (= (.-curve point) curve)
+    (.isValid point)))
 
 (defprotocol PublicKey
   (public-key [this] [this base]))
@@ -132,17 +123,18 @@
 
     (and (= "04" (subs encoded-key 0 2))
       (= 130 (count encoded-key)))
-    (let [x (-> encoded-key (subs 2 66) (->> (new bn)))
-          y (-> encoded-key (subs 66) (->> (new bn)))]
+    (let [x (subs encoded-key 2 66)
+          y (subs encoded-key 66)]
       (public-key
         (new ECPoint curve x y)))
 
     :else
-    (throw (ex-info "Cannot handle encoded public key"
+    (throw (ex-info "Invalid encoding on public key"
              {:encoded-key encoded-key}))))
 
 (extend-protocol PublicKey
-  ECPoint                                                   ; Unboxed
+  ;; Unboxed
+  ECPoint
   (public-key
     ([point _]
      (public-key point))
