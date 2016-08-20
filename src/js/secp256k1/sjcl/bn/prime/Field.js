@@ -51,8 +51,6 @@ goog.require('secp256k1.sjcl.bn');
  * @param {!Array<!Array<number>>} coeff Coefficients that parametrizes the prime field.
  */
 secp256k1.sjcl.bn.prime.Field = function (exponent, coeff) {
-    this.exponent = exponent;
-
     var i,
         tmp = exponent / secp256k1.sjcl.bn.radix,
         mo = Math.ceil(tmp);
