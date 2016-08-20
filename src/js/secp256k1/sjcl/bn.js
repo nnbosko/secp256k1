@@ -47,7 +47,7 @@ goog.require('secp256k1.sjcl.bitArray');
  * Constructs a new BigNum from another BigNum, a number or a hex string.
  * @constructor
  * @final
- * @param {string|number|secp256k1.sjcl.bn} it Object to initialize into a BigNum
+ * @param {string|number|secp256k1.sjcl.bn=} it Object to initialize into a BigNum
  * @struct
  */
 secp256k1.sjcl.bn = function (it) {
@@ -58,6 +58,14 @@ secp256k1.sjcl.bn = function (it) {
         this.limbs = [it];
         //noinspection JSUnresolvedFunction
         this.normalize();
+    } else if (typeof it === "string") {
+        it = it.replace(/^0x/, '');
+        this.limbs = [];
+        // hack
+        k = secp256k1.sjcl.bn.radix / 4;
+        for (i = 0; i < it.length; i += k) {
+            this.limbs.push(parseInt(it.substring(Math.max(it.length - i - k, 0), it.length - i), 16));
+        }
     } else if (it instanceof secp256k1.sjcl.bn) {
       this.limbs = it.limbs.slice(0);
     } else {
@@ -65,19 +73,6 @@ secp256k1.sjcl.bn = function (it) {
             case "object":
                 this.limbs = it.limbs.slice(0);
                 break;
-
-            case "string":
-                it = it.replace(/^0x/, '');
-                this.limbs = [];
-                // hack
-                k = secp256k1.sjcl.bn.radix / 4;
-                for (i = 0; i < it.length; i += k) {
-                    this.limbs.push(parseInt(it.substring(Math.max(it.length - i - k, 0), it.length - i), 16));
-                }
-                break;
-
-            default:
-                this.limbs = [0];
         }
     }
 };
@@ -718,7 +713,7 @@ secp256k1.sjcl.bn.prototype.cnormalize = function () {
 
 /**
  * Convert to a hex string.
- * @return {!string} A hexadecimal representing this number.
+ * @return {string} A hexadecimal representing this number.
  */
 secp256k1.sjcl.bn.prototype.toString = function () {
     this.normalize();
