@@ -4,7 +4,8 @@
 
   https://en.wikipedia.org/wiki/X.690#DER_encoding"
   (:require [secp256k1.formatting.base-convert
-             :refer [hex? add-leading-zero-if-necessary]]))
+             :refer [hex? add-leading-zero-if-necessary
+                     base-to-base]]))
 
 (defn- encode-asn1-length
   [len]
@@ -59,8 +60,8 @@
     {:integer (subs remaining 0 (* 2 length))
      :remaining (subs remaining (* 2 length))}))
 
-(defn DER-decode
-  "Decodes a list of hexadecimal numbers from a string following the distinguished encoding rules"
+(defn- DER-decode-standard
+  "Decodes an ordinary encoded list of numbers from a hexadecimal following the distinguished encoding rules"
   [asn1]
   (assert (hex? asn1), "Input must be hex")
   (assert (= "30" (subs asn1 0 2)), "Input must start with the code 30")
@@ -77,38 +78,55 @@
         (let [{:keys [:integer :remaining]} (decode-asn1-integer remaining)]
           (recur (conj ret integer) remaining))))))
 
+(defn DER-decode
+  "Decodes a list of numbers including an optional recovery byte, following BitCoin's convention"
+  [asn1]
+  (assert (hex? asn1), "Input must be hex")
+  (let [first-byte (subs asn1 0 2)]
+    (cond
+      (#{ "1B" "1C" "1D" "1E"} first-byte)
+      (conj (DER-decode-standard (subs asn1 2))
+            first-byte)
+
+      (= "30" first-byte)
+      (DER-decode-standard asn1)
+
+      :else
+      (throw (ex-info "Input must start with the code 30, or start with a recovery code (either 1B, 1C, 1D, or 1E)"
+                      {:argument asn1})))))
+
 (defn DER-encode
   "Formats a list of hexadecimal numbers using the distinguished encoding rules"
-  [n]
-  (->> n
+  [[R S recover]]
+  (->> [R S]
        (map encode-asn1-unsigned-integer)
        (apply str)
        encode-asn1-unsigned-integer
        (#(subs % 2))
-       (str "30")))
+       (str recover "30")))
 
 
 (defn DER-encode-ECDSA-signature
   "Formats an ECDSA signature"
-  [&{:keys [:R :S :recover]}]
-  (assert (hex? R), "R argument must be hex")
-  (assert (not (empty? R)), "R argument must not be empty")
-  (assert (hex? S), "S argument must be hex")
-  (assert (not (empty? S)), "S argument must not be empty")
-  (cond
-    (empty? recover) (DER-encode [R S])
-    (hex? recover) (DER-encode [R S recover])
-    :else (throw (ex-info "Cannot encode message"
-                          {:R R
-                           :S S
-                           :recover recover}))))
+  [{:keys [R S recover]}
+   & {:keys [input-format output-format]
+      :or {input-format :hex
+           output-format :hex}}]
+  (-> [R S recover]
+      (->> (map #(base-to-base % input-format :hex)))
+      DER-encode
+      (base-to-base :hex output-format)))
 
 (defn DER-decode-ECDSA-signature
   "Formats an ECDSA signature"
-  [ecdsa]
-  (assert (hex? ecdsa), "Argument must be hex")
-  (assert (not (empty? ecdsa)), "Argument must not be empty")
-  (let [[R S recover] (DER-decode ecdsa)]
+  [ecdsa & {:keys [input-format output-format]
+            :or {input-format :hex
+                 output-format :hex}}]
+  (let [[R S recover]
+        (-> ecdsa
+            (base-to-base input-format :hex)
+            DER-decode
+            (->> (map #(base-to-base % :hex output-format))))]
     {:R R
      :S S
      :recover recover}))

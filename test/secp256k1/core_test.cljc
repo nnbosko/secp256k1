@@ -1,13 +1,15 @@
 (ns secp256k1.core-test
   (:require [secp256k1.core :as secp256k1]
-            #?(:cljs [sjcl])
             #?(:clj  [clojure.test
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
                :cljs [cljs.test
                       :refer [is use-fixtures testing are]])
             #?(:cljs [devcards.core
-                      :refer [defcard deftest]])))
+                      :refer [defcard deftest]]))
+  #?(:cljs (:import [secp256k1.sjcl bn]
+                    [secp256k1.sjcl.ecc ECPoint])
+     :clj  (:import [org.bouncycastle.math.ec ECPoint])))
 
 #?(:cljs
    (defcard x962-encode-performance
@@ -388,9 +390,8 @@
        (is (= sin (-> priv
                       secp256k1/get-sin-from-public-key)))
        (is (secp256k1/validate-sin sin))
-       (is (instance? #?(:cljs js/sjcl.ecc.point
-                         :clj  org.spongycastle.math.ec.ECPoint) pub))
-       (is (instance? #?(:cljs js/sjcl.bn
+       (is (instance? ECPoint pub))
+       (is (instance? #?(:cljs bn
                          :clj  java.math.BigInteger) priv))
        ;; TODO: Why doesn't this work with a pub-key?
        (are [x] (secp256k1/verify-signature

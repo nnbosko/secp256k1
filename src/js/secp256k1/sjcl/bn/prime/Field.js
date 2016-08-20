@@ -31,8 +31,8 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** 
- * @fileoverview UTF-8 string handling.
+/**
+ * @fileoverview (PseudoMersenne) Prime fields and field points.
  *
  * @author Emily Stark
  * @author Mike Hamburg
@@ -40,46 +40,44 @@
  * @author Matthew Wampler-Doty
  */
 
-goog.provide('secp256k1.sjcl.codec.utf8String');
-goog.require('secp256k1.sjcl.bitArray');
+goog.provide('secp256k1.sjcl.bn.prime.Field');
+goog.require('secp256k1.sjcl.bn');
 
 /**
- * Convert an array of signed 32 bit words to a UTF-8 encoded string.
- * @param {Array<number>} arr Signed 32 bit array of numbers to convert.
- * @return {string} The utf8Stringadecimal string representing the bytes in the array.
+ * @constructor
+ * @struct
+ * @final
+ * @param {!number} exponent Exponent of the power of two of the Pseudo-Mersenne Prime.
+ * @param {!Array<!Array<number>>} coeff Coefficients that parametrizes the prime field.
  */
-secp256k1.sjcl.codec.utf8String.fromBits = function(arr) {
-    var bl = secp256k1.sjcl.bitArray.bitLength(arr),
-        out = new Array(bl / 8),
-        i, tmp;
-    for (i = 0; i < bl / 8; i++) {
-        if ((i & 3) === 0) {
-            tmp = arr[i / 4];
-        }
-        out[i] = String.fromCharCode(tmp >>> 24);
-        tmp <<= 8;
-    }
-    return decodeURIComponent(escape(out.join('')));
-};
+secp256k1.sjcl.bn.prime.Field = function (exponent, coeff) {
+    this.exponent = exponent;
 
-/** 
- * Convert a UTF-8 encoded string to an array of signed 32 bit words.
- * @param {string} str A UTF-8 encoded string.
- * @return {Array<number>} An array of signed 32 bit words representing the input.
- */
-secp256k1.sjcl.codec.utf8String.toBits = function(str) {
-    str = unescape(encodeURIComponent(str));
-    var out = new Array(Math.ceil(str.length / 4)), 
-	i, j = 0, tmp = 0;
-    for (i = 0; i < str.length; i++) {
-        tmp = tmp << 8 | str.charCodeAt(i);
-        if ((i & 3) === 3) {
-            out[j++] = tmp;
-            tmp = 0;
-        }
+    var i,
+        tmp = exponent / secp256k1.sjcl.bn.radix,
+        mo = Math.ceil(tmp);
+
+    /**
+     * Offset for performing approximate modulus reductions
+     * @type {number}
+     */
+    this.modOffset = mo;
+    this.exponent = exponent;
+    this.offset = new Array(coeff.length);
+    this.factor = new Array(coeff.length);
+    this.minOffset = mo;
+    this.fullOffset = new Array(coeff.length);
+    this.fullFactor = new Array(coeff.length);
+    this.modulus = new secp256k1.sjcl.bn(Math.pow(2, exponent));
+    this.fullMask = 0 | -Math.pow(2, exponent % secp256k1.sjcl.bn.radix);
+
+    for (i = 0; i < coeff.length; i++) {
+        this.offset[i] = Math.floor(coeff[i][0] / secp256k1.sjcl.bn.radix - tmp);
+        this.fullOffset[i] = Math.ceil(coeff[i][0] / secp256k1.sjcl.bn.radix - tmp);
+        this.factor[i] = coeff[i][1] * Math.pow(1 / 2, exponent - coeff[i][0] + this.offset[i] * secp256k1.sjcl.bn.radix);
+        this.fullFactor[i] = coeff[i][1] *
+            Math.pow(1 / 2, exponent - coeff[i][0] + this.fullOffset[i] * secp256k1.sjcl.bn.radix);
+        this.modulus.addM(new secp256k1.sjcl.bn(Math.pow(2, coeff[i][0]) * coeff[i][1]));
+        this.minOffset = Math.min(this.minOffset, -this.offset[i]); // conservative
     }
-    if (i & 3) {
-        out[j] = secp256k1.sjcl.bitArray.partial(8 * (i & 3), tmp);
-    }
-    return out;
 };

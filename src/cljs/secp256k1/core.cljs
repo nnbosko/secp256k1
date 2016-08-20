@@ -1,5 +1,5 @@
 (ns secp256k1.core
-  "A ClojureScript implementation of BitPay's BitAuth protocol
+  "A ClojureScript implementation of ECDSA signatures with secp256k1
 
    https://github.com/bitpay/secp256k1
    http://blog.bitpay.com/2014/07/01/secp256k1-for-decentralized-authentication.html"
@@ -19,78 +19,88 @@
                      byte-array-to-base
                      base58?
                      hex?]]
-            [secp256k1.hashes :refer [sha256 ripemd-160 to-bytes]]
-            [goog.math.Integer :as Integer]
+            [secp256k1.sjcl.ecc.curves :as ecc-curves]
+            [secp256k1.sjcl.bn]
+            [secp256k1.hashes :refer [sha256 ripemd-160]]
             [secp256k1.sjcl.bitArray :as bitArray]
             [secp256k1.sjcl.codec.bytes :as bytes]
-            [secp256k1.sjcl.codec.hex :as hex]))
+            [secp256k1.sjcl.codec.hex :as hex])
+  (:import [secp256k1.sjcl bn]
+           [secp256k1.sjcl.ecc ECPoint]))
 
 ;;; CONSTANTS
+
+(extend-protocol IEquiv
+  bn
+  (-equiv [a b]
+    (and
+      (instance? bn b)
+      (.equals a b)))
+
+  ECPoint
+  (-equiv [a b]
+    (and
+      (instance? ECPoint b)
+      (= (.-curve a) (.-curve b))
+      (if (.-isIdentity a)
+        (.-isIdentity b)
+        (let [ax (-> a .-x)
+              bx (-> b .-x)
+              ay (-> a .-y)
+              by (-> b .-y)]
+          (and
+            (every? (complement nil?) [ax bx ay by])
+            (= ax bx)
+            (= ay by)))))))
 
 (defonce
   ^:private
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
-  curve js/sjcl.ecc.curves.k256)
+  curve ecc-curves/k256)
 
-(extend-protocol IEquiv
-  js/sjcl.bn
-  (-equiv [a b]
-    (and
-     (instance? js/sjcl.bn b)
-     (.equals a b)))
-
-  js/sjcl.ecc.point
-  (-equiv [a b]
-    (and
-     (instance? js/sjcl.ecc.point b)
-     (let [ax (.-x a)
-           bx (.-x b)
-           ay (.-y a)
-           by (.-y b)]
-       (and (= ax bx)
-            (= ay by))))))
 
 (defprotocol PrivateKey
   (private-key [this] [this base]))
 
 (extend-protocol PrivateKey
 
-  js/sjcl.bn ; Unboxed
+  bn                                                        ; Unboxed
   (private-key
     ([priv-key _] (private-key priv-key))
     ([priv-key]
      (assert
-      (= (.greaterEquals priv-key 1) 1)
-      "Private key should be greater than or equal to 1")
+       (.greaterEquals priv-key 1)
+       "Private key should be greater than or equal to 1")
      (assert
-      (= (.greaterEquals (.-r curve) priv-key) 1)
-      "Private key should be less than or equal to the curve modulus")
+       (.greaterEquals (.-r curve) priv-key)
+       "Private key should be less than or equal to the curve modulus")
      priv-key))
 
   string
   (private-key
     ([this base]
      (-> this
-         (base-to-base base :hex)
-         (->> (new js/sjcl.bn))
-         private-key))
+       (base-to-base base :hex)
+       (->> (new bn))
+       private-key))
     ([this]
      (private-key this :hex))))
 
+;; TODO: Use class method
 (defn- valid-point?
   "Predicate to determine if something is a valid ECC point on our curve"
   [point]
-  (and (instance? js/sjcl.ecc.point point)
-       (let [x (.-x point)
-             y (.-y point)
-             a (.-a curve)
-             b (.-b curve)
-             modulus (-> curve .-field .-modulus)]
-         (and
-          (instance? js/sjcl.bn x)
-          (instance? js/sjcl.bn y)
-          (= (.mod (.add (.mul x (.add a (.square x))) b) modulus)
-             (.mod (.square y) modulus))))))
+  (and (instance? ECPoint point)
+    (let [x       (.-x point)
+          y       (.-y point)
+          a       (.-a curve)
+          b       (.-b curve)
+          modulus (-> curve .-field .-modulus)]
+      (and
+        (instance? bn x)
+        (instance? bn y)
+        (= (.mod (.add (.mul x (.add a (.square x))) b) modulus)
+          (.mod (.square y) modulus))))))
 
 (defprotocol PublicKey
   (public-key [this] [this base]))
@@ -102,37 +112,37 @@
   [encoded-key]
   (cond
     (and (#{"02" "03"} (subs encoded-key 0 2))
-         (= 66 (count encoded-key)))
+      (= 66 (count encoded-key)))
     (let [x           (-> encoded-key
-                          (subs 2 66)
-                          (->> (new js/sjcl.bn)))
+                        (subs 2 66)
+                        (->> (new bn)))
           y-even?     (= (subs encoded-key 0 2) "02")
           modulus     (-> curve .-field .-modulus)
           ;; √(x * (a + x**2) + b) % p
           y-candidate (modular-square-root
-                       (.add
-                        (.mul x (.add (.-a curve) (.square x)))
-                        (.-b curve))
-                       modulus)
-          y          (if (= y-even? (even? y-candidate))
-                       y-candidate
-                       (.sub modulus y-candidate))]
+                        (.add
+                          (.mul x (.add (.-a curve) (.square x)))
+                          (.-b curve))
+                        modulus)
+          y           (if (= y-even? (even? y-candidate))
+                        y-candidate
+                        (.sub modulus y-candidate))]
       (public-key
-       (new js/sjcl.ecc.point curve x y)))
+        (new ECPoint curve x y)))
 
     (and (= "04" (subs encoded-key 0 2))
-         (= 130 (count encoded-key)))
-    (let [x (-> encoded-key (subs 2 66) (->> (new js/sjcl.bn)))
-          y (-> encoded-key (subs 66) (->> (new js/sjcl.bn)))]
+      (= 130 (count encoded-key)))
+    (let [x (-> encoded-key (subs 2 66) (->> (new bn)))
+          y (-> encoded-key (subs 66) (->> (new bn)))]
       (public-key
-       (new js/sjcl.ecc.point curve x y)))
+        (new ECPoint curve x y)))
 
     :else
     (throw (ex-info "Cannot handle encoded public key"
-                    {:encoded-key encoded-key}))))
+             {:encoded-key encoded-key}))))
 
 (extend-protocol PublicKey
-  js/sjcl.ecc.point ; Unboxed
+  ECPoint                                                   ; Unboxed
   (public-key
     ([point _]
      (public-key point))
@@ -144,12 +154,12 @@
   (public-key
     ([encoded-key base]
      (-> encoded-key
-         (base-to-base base :hex)
-         x962-decode))
+       (base-to-base base :hex)
+       x962-decode))
 
     ([this] (public-key this :hex)))
 
-  js/sjcl.bn
+  bn
   (public-key
     ([priv-key _] (public-key priv-key))
     ([priv-key]
@@ -159,17 +169,18 @@
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
   [pub-key &
    {:keys [compressed output-format input-format]
-    :or   {compressed true
-           input-format :hex
+    :or   {compressed    true
+           input-format  :hex
            output-format :hex}}]
   (let [point (public-key pub-key input-format)
-        x     (-> point .-x .toBits hex/fromBits)]
+        l     (-> point .-curve .-field .-exponent)
+        x     (-> point .-x (.toBits l) hex/fromBits)]
     (->
-     (if compressed
-       (str (if (-> point .-y even?) "02" "03") x)
-       (let [y (-> point .-y .toBits hex/fromBits)]
-         (str "04" x y)))
-     (base-to-base :hex output-format))))
+      (if compressed
+        (str (if (-> point .-y even?) "02" "03") x)
+        (let [y (-> point .-y .toBits hex/fromBits)]
+          (str "04" x y)))
+      (base-to-base :hex output-format))))
 
 ;; TODO: Switch to bitcoin addresses, use SJCL to keep stuff DRY, use different input bases
 (defn get-sin-from-public-key
@@ -201,13 +212,14 @@
   "Sign some data with a private-key"
   [priv-key data]
   (let [d    (private-key priv-key)
+; TODO: use a better way of getting the length
         n    (.-r curve)
         l    (.bitLength n)
         hash (-> data sha256 bytes/toBits)
         z    (-> (if (> (bitArray/bitLength hash) l)
                    (bitArray/clamp hash l)
                    hash)
-                 js/sjcl.bn.fromBits)]
+                 secp256k1.sjcl.bn/fromBits)]
     (loop []
       ;; TODO: Use RFC 6979 here
       (let [k (.add (secure-random (.sub n 1)) 1)
@@ -217,8 +229,8 @@
               (.equals s 0) (recur)
               :else
               (DER-encode-ECDSA-signature
-               :R (-> r (.toBits l) hex/fromBits)
-               :S (-> s (.toBits l) hex/fromBits)))))))
+               {:R (-> r (.toBits l) hex/fromBits)
+                :S (-> s (.toBits l) hex/fromBits)}))))))
 
 ;; TODO: Support Base58 encoding
 (defn verify-signature
@@ -233,12 +245,12 @@
             s-hex :S} (DER-decode-ECDSA-signature hex-signature)
            pub-key    (public-key key)
            n          (.-r curve)
-           r          (-> (new js/sjcl.bn r-hex) (.mod n))
-           s-inv      (-> (new js/sjcl.bn s-hex) (.inverseMod n))
+           r          (-> (new bn r-hex) (.mod n))
+           s-inv      (-> (new bn s-hex) (.inverseMod n))
            z          (-> data
                           sha256
                           bytes/toBits
-                          js/sjcl.bn.fromBits
+                          secp256k1.sjcl.bn/fromBits
                           (.mod n))
            u1         (-> z
                           (.mul s-inv)

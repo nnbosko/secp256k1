@@ -186,13 +186,15 @@
      (assert (base58? data) "Input must be in base58")
      (-> data
          base58-to-byte-array
-         DatatypeConverter/printHexBinary
-         lower-case)))
+         (byte-array-to-base :hex))))
 
 (defn base-to-base
   "Convert one base into another"
   [data input-format output-format]
   (cond
+    (nil? data)
+    data
+
     (= input-format output-format)
     data
 

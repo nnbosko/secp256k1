@@ -82,9 +82,8 @@ secp256k1.sjcl.bitArray.bitSlice = function(a, bstart, bend) {
  * @return {Number} The requested slice.
  */
 secp256k1.sjcl.bitArray.extract = function(a, bstart, blength) {
-    // FIXME: this Math.floor is not necessary at all, but for some reason
-    // seems to suppress a bug in the Chromium JIT.
     var x, sh = Math.floor((-bstart - blength) & 31);
+    //noinspection JSBitwiseOperatorUsage
     if ((bstart + blength - 1 ^ bstart) & -32) {
         // it crosses a boundary
         x = (a[bstart / 32 | 0] << (32 - sh)) ^ (a[bstart / 32 + 1 | 0] >>> sh);
@@ -199,8 +198,7 @@ secp256k1.sjcl.bitArray.equal = function(a, b) {
  * @private
  */
 secp256k1.sjcl.bitArray._shiftRight = function(a, shift, carry, out) {
-    var i, last2 = 0,
-        shift2;
+    var i, last2, shift2;
     if (out === undefined) {
         out = [];
     }
@@ -226,7 +224,7 @@ secp256k1.sjcl.bitArray._shiftRight = function(a, shift, carry, out) {
 };
 
 /** 
- * byteswap a word array inplace.
+ * Byteswap a word array inplace.
  * (does not handle partial words)
  * @param {Array<number>} a word array.
  * @return {Array<number>} Byteswapped array.

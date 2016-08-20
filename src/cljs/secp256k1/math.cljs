@@ -4,23 +4,24 @@
             [secp256k1.formatting.base-convert
              :refer [add-leading-zero-if-necessary]]
             [goog.array :refer [toArray]])
-  (:import [secp256k1.math.random Isaac]))
+  (:import [secp256k1.math.random Isaac]
+           [secp256k1.sjcl bn]))
 
 (defn even?
   "Patch the usual cljs.core/even? to work for sjcl.bn instances"
   [n]
-  (if (instance? js/sjcl.bn n)
+  (if (instance? bn n)
     (.equals (.mod n 2) 0)
     (cljs.core/even? n)))
 
+;; TODO: Move this routine to sjcl.bn.prime
 (defn modular-square-root
   "Compute the square root of a number modulo a prime"
   [n modulus]
-  (let [modulus (new js/sjcl.bn modulus)
-        n       (.mod (new js/sjcl.bn n) modulus)
+  (let [modulus (if (instance? bn modulus) modulus (new bn modulus))
+        n       (.mod (new bn n) modulus)
         mod8    (-> modulus (.mod 8) .toString js/parseInt)]
-    (assert (= (.greaterEquals modulus 0) 1),
-            "Modulus must be non-negative")
+    (assert (.greaterEquals modulus 0), "Modulus must be non-negative")
     (cond
       (.equals n 0) n
 
@@ -49,9 +50,9 @@
                      (iterate #(.halveM %))
                      (take-while even?)
                      count)
-            two (new js/sjcl.bn 2)
+            two (new bn 2)
             z   (->> (range) rest rest
-                     (map #(new js/sjcl.bn %))
+                     (map #(new bn %))
                      (map #(.powermod % q modulus))
                      (filter
                       #(not
@@ -117,12 +118,12 @@
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"
   [arg]
-  (let [n          (new js/sjcl.bn arg)
+  (let [n          (new bn arg)
         byte-count (-> n .bitLength (/ 8))
         bytes      (secure-random-bytes byte-count)]
     (-> bytes
         (->> (map #(add-leading-zero-if-necessary
                     (.toString % 16)))
              (apply str)
-             (new js/sjcl.bn))
+             (new bn))
         (.mod n))))

@@ -31,7 +31,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** 
+/**
  * @fileoverview Javascript RIPEMD-160 implementation.
  *
  * @author Artem S Vybornov <vybornov@gmail.com>
@@ -47,7 +47,7 @@ goog.require('secp256k1.sjcl.codec.bytes');
  * @constructor
  * @struct
  */
-secp256k1.sjcl.hash.Ripemd160 = function(hash) {
+secp256k1.sjcl.hash.Ripemd160 = function() {
     /**
      * Holds the current values of accumulated A-E variables (MD buffer).
      * @type {!Array<number>}
@@ -55,16 +55,6 @@ secp256k1.sjcl.hash.Ripemd160 = function(hash) {
      */
     this._h = new Array(5);
     this.reset();
-};
-
-/**
- * Hash a string or an array of words.
- * @static
- * @param {Array<number>|String} data the data to hash.
- * @return {Array<number>} The hash value, an array of 5 big-endian words.
- */
-secp256k1.sjcl.hash.Ripemd160.hash = function(data) {
-    return (new secp256k1.sjcl.hash.Ripemd160()).update(data).digest();
 };
 
 /**
@@ -95,6 +85,7 @@ secp256k1.sjcl.hash.Ripemd160.prototype.reset = function() {
     return this;
 };
 
+//noinspection JSUnusedGlobalSymbols
 /**
  * Update the hash state.
  * @param {Array<number>} data the data to hash.
@@ -115,13 +106,14 @@ secp256k1.sjcl.hash.Ripemd160.prototype.update = function(data) {
         words = b.splice(0, 16);
         for (w = 0; w < 16; ++w) {
             words[w] = swap32(words[w]);
-	}
+        }
         this._block(words);
     }
 
     return this;
 };
 
+//noinspection JSUnusedGlobalSymbols
 /**
  * Complete hashing and output the hash value.
  * @return {Array<number>} The hash value, an array of 5 big-endian words.
@@ -162,12 +154,13 @@ secp256k1.sjcl.hash.Ripemd160.prototype.digest = function() {
 
 /**
  * Bitwise rotate left.
- * @param {number} val Number to rotate.
+ * @param {number} x Number to rotate.
+ * @param {number} n Bits to rotate by.
  * @return {number} Rotated number.
  * @private
  */
 function rotl (x, n) {
-  return (x << n) | (x >>> (32 - n));
+    return (x << n) | (x >>> (32 - n));
 }
 
 /**
@@ -557,4 +550,3 @@ secp256k1.sjcl.hash.Ripemd160.prototype._block = function(m) {
     this._h[4] = (this._h[0] + bl + cr) | 0;
     this._h[0] = t;
 };
-

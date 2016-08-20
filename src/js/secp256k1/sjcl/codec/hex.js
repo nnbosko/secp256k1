@@ -31,7 +31,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** 
+/**
  * @fileoverview Utility for converting hexadecimal strings to arrays of signed 32 bit words and back.
  *
  * @author Emily Stark
@@ -48,7 +48,7 @@ goog.require('secp256k1.sjcl.bitArray');
  * @param {Array<number>} arr Signed 32 bit array of numbers to convert.
  * @return {string} The hexadecimal string representing the bytes in the array.
  */
-secp256k1.sjcl.codec.hex.fromBits = function(arr) {
+secp256k1.sjcl.codec.hex.fromBits = function (arr) {
     var out = new Array(arr.length), i;
     for (i = 0; i < arr.length; i++) {
         out[i] = ((arr[i] | 0) + 0xF00000000000).toString(16).substr(4);
@@ -56,12 +56,12 @@ secp256k1.sjcl.codec.hex.fromBits = function(arr) {
     return out.join('').substr(0, secp256k1.sjcl.bitArray.bitLength(arr) / 4); //.replace(/(.{8})/g, "$1 ");
 };
 
-/** 
+/**
  * Convert from a hex string to an array of signed 32 bit numbers.
  * @param {string} str A hexadecimal string.
  * @return {Array<number>} An array of signed 32 bit words representing the input.
  */
-secp256k1.sjcl.codec.hex.toBits = function(str) {
+secp256k1.sjcl.codec.hex.toBits = function (str) {
     var i, j, out, len;
     str = str.replace(/\s|0x/g, "");
     len = str.length;

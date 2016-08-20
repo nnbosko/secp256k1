@@ -31,7 +31,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/** 
+/**
  * @fileoverview Utility for converting arrays of bytes to arrays of signed 32 bit words
  *
  * @author Emily Stark
@@ -48,35 +48,36 @@ goog.require('secp256k1.sjcl.bitArray');
  * @param {Array<number>} arr Signed 32 bit array of numbers to convert.
  * @return {Array<number>} A byte array with the same data as the input.
  */
-secp256k1.sjcl.codec.bytes.fromBits = function(arr) {
-    var bl = sjcl.bitArray.bitLength(arr), 
-	out = new Array(bl / 8), i, tmp;
-    for (i=0; i < bl / 8; i++) {
-      if ((i&3) === 0) {
-        tmp = arr[i/4];
-      }
-      out[i] = tmp >>> 24;
-      tmp <<= 8;
+secp256k1.sjcl.codec.bytes.fromBits = function (arr) {
+    var bl = sjcl.bitArray.bitLength(arr),
+        out = new Array(bl / 8), i, tmp;
+    for (i = 0; i < bl / 8; i++) {
+        if ((i & 3) === 0) {
+            tmp = arr[i / 4];
+        }
+        out[i] = tmp >>> 24;
+        tmp <<= 8;
     }
     return out;
 };
 
-/** 
+/**
  * Convert from a byte array to an array of 32 bit words.
  * @param {Array<number>} bytes An array of bytes.
  * @return {Array<number>} An array of signed 32 bit words representing the input.
  */
-secp256k1.sjcl.codec.bytes.toBits = function(bytes) {
-    var out = new Array(Math.ceil(bytes.length / 4)), i, j = 0, tmp=0;
-    for (i=0; i<bytes.length; i++) {
-      tmp = tmp << 8 | bytes[i];
-      if ((i&3) === 3) {
-        out[j++] = tmp;
-        tmp = 0;
-      }
+secp256k1.sjcl.codec.bytes.toBits = function (bytes) {
+    var out = new Array(Math.ceil(bytes.length / 4)), i, j = 0, tmp = 0;
+    for (i = 0; i < bytes.length; i++) {
+        tmp = tmp << 8 | bytes[i];
+        if ((i & 3) === 3) {
+            out[j++] = tmp;
+            tmp = 0;
+        }
     }
-    if (i&3) {
-      out[j] = sjcl.bitArray.partial(8*(i&3), tmp);
+    //noinspection JSBitwiseOperatorUsage
+    if (i & 3) {
+        out[j] = sjcl.bitArray.partial(8 * (i & 3), tmp);
     }
     return out;
 };
