@@ -82,7 +82,7 @@ secp256k1.sjcl.bn.prime.reduce = function (x, field) {
  * Mostly constant-time, very expensive full reduction mod p (in place).
  * @param {!secp256k1.sjcl.bn} x BigNum to reduce mod p
  * @param {!secp256k1.sjcl.bn.prime.Field} p The field to reduce by
- * @return {!secp256k1.sjcl.bn} Reduced value
+ * @return {secp256k1.sjcl.bn} Reduced value
  */
 secp256k1.sjcl.bn.prime.fullReduce = function (x, p) {
     var greater, i, reduce = (p.fullMask === -1) ?
