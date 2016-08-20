@@ -1,7 +1,6 @@
 (ns secp256k1.math
   (:refer-clojure :exclude [even?])
-  (:require [sjcl]
-            [secp256k1.formatting.base-convert
+  (:require [secp256k1.formatting.base-convert
              :refer [add-leading-zero-if-necessary]]
             [goog.array :refer [toArray]])
   (:import [secp256k1.math.random Isaac]
@@ -14,7 +13,7 @@
     (.equals (.mod n 2) 0)
     (cljs.core/even? n)))
 
-;; TODO: Move this routine to sjcl.bn.prime
+;; TODO: Move this routine to secp256k1.sjcl.bn.prime
 (defn modular-square-root
   "Compute the square root of a number modulo a prime"
   [n modulus]

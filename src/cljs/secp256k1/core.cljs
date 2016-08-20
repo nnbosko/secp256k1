@@ -2,8 +2,7 @@
   "A ClojureScript implementation of ECDSA signatures with secp256k1"
 
   (:refer-clojure :exclude [even?])
-  (:require [sjcl]
-            [secp256k1.formatting.der-encoding
+  (:require [secp256k1.formatting.der-encoding
              :refer [DER-encode-ECDSA-signature
                      DER-decode-ECDSA-signature]]
             [secp256k1.math
@@ -54,7 +53,6 @@
   ^:private
   ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
   curve ecc-curves/k256)
-
 
 (defprotocol PrivateKey
   (private-key [this] [this base]))
