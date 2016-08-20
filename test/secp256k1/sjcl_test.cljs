@@ -206,4 +206,13 @@
   (testing "Can multiply a point"
     (is (= "0x4a5169f673aa632f538aaa128b6348536db2b637fd89073d49b6a23879cdb3ad"
           (-> js/sjcl.ecc.curves.k256.G (.mult 1000) .-x .toString)
-          (-> ecc-curves/k256.G (.mult 1000) .-x .toString)))))
+          (-> ecc-curves/k256.G (.mult 1000) .-x .toString))))
+  (testing "Can check if a point is valid or not"
+    (is (.isValid ecc-curves/k256.G)
+      "Generator point is valid")
+    (is (.isValid (.mult ecc-curves/k256.G "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"))
+      "Generator • 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF is valid")
+    (is (not (.isValid (ECPoint. ecc-curves/k256 123 123)))
+      "Sad Path: Silly point is not valid")
+    (is (-> ecc-curves/k256.G .toJac .isValid)
+      "Generator point is valid (using Jacobian coordinates)")))
