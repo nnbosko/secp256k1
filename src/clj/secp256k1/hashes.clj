@@ -3,11 +3,11 @@
 
   (:import
    java.security.MessageDigest
-   org.spongycastle.crypto.digests.RIPEMD160Digest
-   org.spongycastle.crypto.digests.SHA256Digest
-   org.spongycastle.crypto.macs.HMac
-   org.spongycastle.crypto.params.KeyParameter
-   org.spongycastle.crypto.signers.ECDSASigner))
+   org.bouncycastle.crypto.digests.RIPEMD160Digest
+   org.bouncycastle.crypto.digests.SHA256Digest
+   org.bouncycastle.crypto.macs.HMac
+   org.bouncycastle.crypto.params.KeyParameter
+   org.bouncycastle.crypto.signers.ECDSASigner))
 
 (defprotocol ByteSerializable
   "Serialize data into a byte array"

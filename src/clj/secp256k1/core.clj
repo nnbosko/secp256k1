@@ -12,20 +12,20 @@
             [clojure.set])
   (:import java.io.ByteArrayOutputStream
            java.security.SecureRandom
-           org.spongycastle.asn1.ASN1InputStream
-           org.spongycastle.asn1.ASN1Integer
-           org.spongycastle.asn1.DERSequenceGenerator
-           org.spongycastle.asn1.sec.SECNamedCurves
-           org.spongycastle.crypto.generators.ECKeyPairGenerator
-           org.spongycastle.crypto.params.ECDomainParameters
-           org.spongycastle.crypto.params.ECKeyGenerationParameters
-           org.spongycastle.crypto.params.ECPrivateKeyParameters
-           org.spongycastle.crypto.params.ECPublicKeyParameters
-           org.spongycastle.crypto.signers.ECDSASigner))
+           org.bouncycastle.asn1.ASN1InputStream
+           org.bouncycastle.asn1.ASN1Integer
+           org.bouncycastle.asn1.DERSequenceGenerator
+           org.bouncycastle.asn1.sec.SECNamedCurves
+           org.bouncycastle.crypto.generators.ECKeyPairGenerator
+           org.bouncycastle.crypto.params.ECDomainParameters
+           org.bouncycastle.crypto.params.ECKeyGenerationParameters
+           org.bouncycastle.crypto.params.ECPrivateKeyParameters
+           org.bouncycastle.crypto.params.ECPublicKeyParameters
+           org.bouncycastle.crypto.signers.ECDSASigner))
 
 (defonce
   ^:private
-  ^{:doc "The secp256k1 curve object provided by SpongyCastle that is used often"}
+  ^{:doc "The secp256k1 curve object provided by BouncyCastle that is used often"}
   curve
   (let [params (SECNamedCurves/getByName "secp256k1")]
     (ECDomainParameters. (.getCurve params)
@@ -69,7 +69,7 @@
 (defn- valid-point?
   "Determine if an Secp256k1 point is valid"
   [point]
-  (and (instance? org.spongycastle.math.ec.ECPoint point)
+  (and (instance? org.bouncycastle.math.ec.ECPoint point)
        (let [x       (-> point .getXCoord .toBigInteger)
              y       (-> point .getYCoord .toBigInteger)
              ecc     (.getCurve curve)
@@ -88,7 +88,7 @@
     ([data _] (public-key data))
     ([data] (public-key (.decodePoint (.getCurve curve) data))))
 
-  org.spongycastle.math.ec.ECPoint ; Unboxed
+  org.bouncycastle.math.ec.ECPoint ; Unboxed
   (public-key
     ([this _] (public-key this))
     ([this]
@@ -170,11 +170,11 @@
   "Sign some data with a private-key"
   [priv-key data]
   (let [input (-> data (.getBytes "UTF-8") sha256)
-        spongy-priv-key (-> priv-key
+        bouncy-priv-key (-> priv-key
                             private-key
                             (ECPrivateKeyParameters. curve))
         sigs (-> (ECDSASigner.)
-                 (doto (.init true spongy-priv-key))
+                 (doto (.init true bouncy-priv-key))
                  (.generateSignature input))
         bos (ByteArrayOutputStream.)]
     (with-open [s (DERSequenceGenerator. bos)]
@@ -189,11 +189,11 @@
 (defn- verify
   "Verifies the given ASN.1 encoded ECDSA signature against a hash (byte-array) using a specified public key."
   [key, input, hex-signature]
-  (let [spongy-pub-key (-> key
+  (let [bouncy-pub-key (-> key
                            public-key
                            (ECPublicKeyParameters. curve))
         signature (base-to-byte-array hex-signature :hex)
-        verifier (doto (ECDSASigner.) (.init false spongy-pub-key))]
+        verifier (doto (ECDSASigner.) (.init false bouncy-pub-key))]
     (with-open [decoder (ASN1InputStream. signature)]
       (let [sequence (.readObject decoder)
             r (-> sequence (.getObjectAt 0) .getValue)

@@ -10,7 +10,7 @@
   :test-paths ["test"]
   :repositories [["jitpack" "https://jitpack.io"]]
   :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
-                 [com.madgag.spongycastle/core "1.54.0.0"]
+                 [org.bouncycastle/bcprov-jdk15on "1.54"]
                  [org.clojure/clojure "1.9.0-alpha10"]
                  [org.clojure/clojurescript "1.9.198"]]
 
@@ -33,7 +33,8 @@
      :source-paths ["src/cljs" "src/cljc" "src/js" "test"]
      :figwheel {:devcards true}
      :compiler
-     {:main "secp256k1.tester"
+     {:main       secp256k1.tester
+      :preloads   [devtools.preload]
       :asset-path "js/compiled/devcards_out"
       :output-to "dev-resources/public/js/compiled/secp256k1_devcards.js"
       :output-dir "dev-resources/public/js/compiled/devcards_out"

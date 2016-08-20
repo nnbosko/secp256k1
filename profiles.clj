@@ -1,16 +1,14 @@
 {:profiles/dev
- {:dependencies [[cljsjs/react-dom-server "15.3.0-0"]
+ {:dependencies [[binaryage/devtools "0.8.1"]
+                 [cljsjs/react-dom-server "15.3.0-0"]
                  [cljsjs/react-dom "15.3.0-0"]
                  [cljsjs/react "15.3.0-0"]
-                 [compojure "1.5.1"]
                  [devcards "0.2.1-7"
                   :exclusions
                   [[cljsjs/react-dom-server]
                    [cljsjs/react-dom]
                    [cljsjs/react]]]
-                 [doo "0.1.7"]
-                 [http-kit "2.2.0"]
-                 [ring/ring-defaults "0.2.1"]]
+                 [doo "0.1.7"]]
 
   :plugins [[lein-npm "0.6.2"]
             [lein-shell "0.5.0"]
