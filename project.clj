@@ -8,9 +8,7 @@
   :jar-exclusions [#"\.DS_Store"]
   :source-paths ["src/clj" "src/cljs" "src/cljc" "src/js"]
   :test-paths ["test"]
-  :repositories [["jitpack" "https://jitpack.io"]]
-  :dependencies [[com.github.Sepia-Officinalis/sjcl-cljs "0.1.9"]
-                 [org.bouncycastle/bcprov-jdk15on "1.54"]
+  :dependencies [[org.bouncycastle/bcprov-jdk15on "1.54"]
                  [org.clojure/clojure "1.9.0-alpha10"]
                  [org.clojure/clojurescript "1.9.198"]]
 

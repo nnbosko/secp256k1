@@ -3,7 +3,6 @@
   (:require [clojure.set :refer [subset?]]
             [clojure.string :refer [lower-case]]
     #?@(:cljs [[goog.crypt]
-               [sjcl]
                [secp256k1.sjcl.bn :as bn]
                [goog.crypt.base64]
                [goog.math.Integer :as Integer]]))

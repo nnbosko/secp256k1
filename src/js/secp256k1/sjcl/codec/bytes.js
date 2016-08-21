@@ -49,7 +49,7 @@ goog.require('secp256k1.sjcl.bitArray');
  * @return {Array<number>} A byte array with the same data as the input.
  */
 secp256k1.sjcl.codec.bytes.fromBits = function (arr) {
-    var bl = sjcl.bitArray.bitLength(arr),
+    var bl = secp256k1.sjcl.bitArray.bitLength(arr),
         out = new Array(bl / 8), i, tmp;
     for (i = 0; i < bl / 8; i++) {
         if ((i & 3) === 0) {
@@ -77,7 +77,7 @@ secp256k1.sjcl.codec.bytes.toBits = function (bytes) {
     }
     //noinspection JSBitwiseOperatorUsage
     if (i & 3) {
-        out[j] = sjcl.bitArray.partial(8 * (i & 3), tmp);
+        out[j] = secp256k1.sjcl.bitArray.partial(8 * (i & 3), tmp);
     }
     return out;
 };
