@@ -6,9 +6,9 @@
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
                :cljs [cljs.test
-                      :refer [is use-fixtures testing are]])
+                      :refer-macros [is use-fixtures testing are]])
             #?(:cljs [devcards.core
-                      :refer [defcard deftest]])))
+                      :refer-macros [defcard deftest]])))
 
 ;; TODO: Implement for clojurescript
 #?(:clj

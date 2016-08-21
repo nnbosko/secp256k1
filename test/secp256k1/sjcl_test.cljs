@@ -1,7 +1,7 @@
 (ns secp256k1.sjcl-test
   (:require
-    [clojure.test :refer [is use-fixtures testing are]]
-    [devcards.core :refer [deftest defcard]]
+    [clojure.test :refer-macros [is use-fixtures testing are]]
+    [devcards.core :refer-macros [deftest defcard]]
     [secp256k1.math :refer [modular-square-root]]
     [secp256k1.sjcl.bn]
     [secp256k1.core]
