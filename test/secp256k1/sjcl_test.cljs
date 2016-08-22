@@ -26,7 +26,11 @@
           (-> (new bn 2) (.mulmod 2 3)))))
   (testing "Can copy"
     (is (= (bn. 2)
-          (-> (new bn 2) .copy)))))
+          (-> (new bn 2) .copy))))
+  (testing "Can exponentiate"
+    (is (= (-> 6 bn. (.power 46))
+          (.mul (-> 3 bn. (.power 46))
+            (-> 2 bn. (.power 46)))))))
 
 
 (deftest bn-equality-testing
@@ -37,11 +41,21 @@
     (is (= (bn. 1) (new bn "1")))
     (is (= (bn. "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f")
           (new bn "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f")))
+    (is (= (bn. "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f")
+          (-> "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f" bn. .toBits secp256k1.sjcl.bn/fromBits))
+      "fromBits is the inverse of .toBits")
     (is (= (-> "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
              bn.
              .toBits
              secp256k1.sjcl.bn/fromBits)
           (new bn "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f")))))
+
+(deftest bn-montgomery-exponentiation
+  (testing "Montgomery exponentiation agrees with conventional modular exponentiation"
+    (is (= (-> 2 bn. (.powermod 100 prime/p256k.modulus))
+          (-> 2 bn. (.montpowermod 100 prime/p256k.modulus))))
+    (is (= (-> "0xfffffffffffffffffffffffffffffffffffffffff" bn. (.powermod 100 prime/p256k.modulus))
+          (-> "0xfffffffffffffffffffffffffffffffffffffffff" bn. (.montpowermod 100 prime/p256k.modulus))))))
 
 (deftest prime-field-test
   (testing "Prime fields let you construct points that inherit from bn"

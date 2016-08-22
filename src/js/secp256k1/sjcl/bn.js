@@ -47,7 +47,7 @@ goog.require('secp256k1.sjcl.bitArray');
  * Constructs a new BigNum from another BigNum, a number or a hex string.
  * @constructor
  * @final
- * @param {string|number|secp256k1.sjcl.bn=} it Object to initialize into a BigNum
+ * @param {string|number|secp256k1.sjcl.bn} it Object to initialize into a BigNum
  * @struct
  */
 secp256k1.sjcl.bn = function (it) {
@@ -69,13 +69,16 @@ secp256k1.sjcl.bn = function (it) {
     } else if (it instanceof secp256k1.sjcl.bn) {
       this.limbs = it.limbs.slice(0);
     } else {
-        switch (typeof it) {
-            case "object":
-                this.limbs = it.limbs.slice(0);
-                break;
-        }
+        throw new Error("Could not construct bn from argument");
     }
 };
+
+/**
+ * The maximum number of multiplications that can be performed before propagating carries
+ * @const
+ * @type {number}
+ */
+secp256k1.sjcl.bn.maxMul = 8;
 
 /**
  * Radix class constant.
@@ -106,272 +109,288 @@ secp256k1.sjcl.bn.placeVal = Math.pow(2, secp256k1.sjcl.bn.radix);
 secp256k1.sjcl.bn.ipv = 1 / secp256k1.sjcl.bn.placeVal;
 
 
-secp256k1.sjcl.bn.prototype = {
+/**
+ * this ^ n.  Uses square-and-multiply.  Normalizes.
+ * @param {string|number|secp256k1.sjcl.bn} n Exponent to raise to
+ * @returns {secp256k1.sjcl.bn}
+ */
+secp256k1.sjcl.bn.prototype.power = function (n) {
+    var l = new secp256k1.sjcl.bn(n).normalize().trim().limbs;
+    var i, j, out = new secp256k1.sjcl.bn(1), pow = this;
 
-    /** this ^ n.  Uses square-and-multiply.  Normalizes and reduces. */
-    power: function (l) {
-        l = new secp256k1.sjcl.bn(l).normalize().trim().limbs;
-        var i, j, out = new secp256k1.sjcl.bn(1), pow = this;
-
-        for (i = 0; i < l.length; i++) {
-            for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
-                //noinspection JSBitwiseOperatorUsage
-                if (l[i] & (1 << j)) {
-                    out = out.mul(pow);
-                }
-                if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
-                    break;
-                }
-
-                pow = pow.square();
+    for (i = 0; i < l.length; i++) {
+        for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
+            //noinspection JSBitwiseOperatorUsage
+            if (l[i] & (1 << j)) {
+                out = out.mul(pow);
             }
-        }
-
-        return out;
-    },
-
-    /** this ^ x mod N */
-    powermod: function (x, N) {
-        x = new secp256k1.sjcl.bn(x);
-        N = new secp256k1.sjcl.bn(N);
-
-        // Jump to montpowermod if possible.
-        if ((N.limbs[0] & 1) == 1) {
-            var montOut = this.montpowermod(x, N);
-
-            if (montOut != false) {
-                return montOut;
-            } // else go to slow powermod
-        }
-
-        var i, j, l = x.normalize().trim().limbs, out = new secp256k1.sjcl.bn(1), pow = this;
-
-        for (i = 0; i < l.length; i++) {
-            for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
-                //noinspection JSBitwiseOperatorUsage
-                if (l[i] & (1 << j)) {
-                    out = out.mulmod(pow, N);
-                }
-                if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
-                    break;
-                }
-
-                pow = pow.mulmod(pow, N);
-            }
-        }
-
-        return out;
-    },
-
-    /** this ^ x mod N with Montgomery reduction */
-    montpowermod: function (x, N) {
-        x = new secp256k1.sjcl.bn(x).normalize().trim();
-        N = new secp256k1.sjcl.bn(N);
-
-        var i, j,
-            radix = secp256k1.sjcl.bn.radix,
-            out = new secp256k1.sjcl.bn(1),
-            pow = this.copy();
-
-        // Generate R as a cap of N.
-        var R, s, wind, bitsize = x.bitLength();
-
-        R = new secp256k1.sjcl.bn({
-            limbs: N.copy().normalize().trim().limbs.map(function () {
-                return 0;
-            })
-        });
-
-        for (s = secp256k1.sjcl.bn.radix; s > 0; s--) {
-            if (((N.limbs[N.limbs.length - 1] >> s) & 1) == 1) {
-                R.limbs[R.limbs.length - 1] = 1 << s;
+            if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
                 break;
             }
+
+            pow = pow.square();
         }
-
-        // Calculate window size as a function of the exponent's size.
-        if (bitsize == 0) {
-            return this;
-        } else if (bitsize < 18) {
-            wind = 1;
-        } else if (bitsize < 48) {
-            wind = 3;
-        } else if (bitsize < 144) {
-            wind = 4;
-        } else if (bitsize < 768) {
-            wind = 5;
-        } else {
-            wind = 6;
-        }
-
-        // Find R' and N' such that R * R' - N * N' = 1.
-        var RR = R.copy(), NN = N.copy(), RP = new secp256k1.sjcl.bn(1), NP = new secp256k1.sjcl.bn(0), RT = R.copy();
-
-        while (RT.greaterEquals(1)) {
-            RT.halveM();
-
-            if ((RP.limbs[0] & 1) == 0) {
-                RP.halveM();
-                NP.halveM();
-            } else {
-                RP.addM(NN);
-                RP.halveM();
-
-                NP.halveM();
-                NP.addM(RR);
-            }
-        }
-
-        RP = RP.normalize();
-        NP = NP.normalize();
-
-        RR.doubleM();
-        var R2 = RR.mulmod(RR, N);
-
-        // Check whether the invariant holds.
-        // If it doesn't, we can't use Montgomery reduction on this modulus.
-        if (!RR.mul(RP).sub(N.mul(NP)).equals(1)) {
-            return false;
-        }
-
-        var montIn = function (c) {
-                return montMul(c, R2);
-            },
-            montMul = function (a, b) {
-                // Standard Montgomery reduction
-                var k, ab, right, abBar, mask = (1 << (s + 1)) - 1;
-                ab = a.mul(b);
-
-                right = ab.mul(NP);
-                right.limbs = right.limbs.slice(0, R.limbs.length);
-
-                if (right.limbs.length == R.limbs.length) {
-                    right.limbs[R.limbs.length - 1] &= mask;
-                }
-
-                right = right.mul(N);
-
-                abBar = ab.add(right).normalize().trim();
-                abBar.limbs = abBar.limbs.slice(R.limbs.length - 1);
-
-                // Division.  Equivelent to calling *.halveM() s times.
-                for (k = 0; k < abBar.limbs.length; k++) {
-                    if (k > 0) {
-                        abBar.limbs[k - 1] |= (abBar.limbs[k] & mask) << (radix - s - 1);
-                    }
-
-                    abBar.limbs[k] = abBar.limbs[k] >> (s + 1);
-                }
-
-                if (abBar.greaterEquals(N)) {
-                    abBar.subM(N);
-                }
-
-                return abBar;
-            },
-            montOut = function (c) {
-                return montMul(c, 1);
-            };
-
-        pow = montIn(pow);
-        out = montIn(out);
-
-        // Sliding-Window Exponentiation (HAC 14.85)
-        var h, precomp = {}, cap = (1 << (wind - 1)) - 1;
-
-        precomp[1] = pow.copy();
-        precomp[2] = montMul(pow, pow);
-
-        for (h = 1; h <= cap; h++) {
-            precomp[(2 * h) + 1] = montMul(precomp[(2 * h) - 1], precomp[2]);
-        }
-
-        var getBit = function (exp, i) { // Gets ith bit of exp.
-            var off = i % secp256k1.sjcl.bn.radix;
-
-            return (exp.limbs[Math.floor(i / secp256k1.sjcl.bn.radix)] & (1 << off)) >> off;
-        };
-
-        for (i = x.bitLength() - 1; i >= 0;) {
-            if (getBit(x, i) == 0) {
-                // If the next bit is zero:
-                //   Square, move forward one bit.
-                out = montMul(out, out);
-                i = i - 1;
-            } else {
-                // If the next bit is one:
-                //   Find the longest sequence of bits after this one, less than `wind`
-                //   bits long, that ends with a 1.  Convert the sequence into an
-                //   integer and look up the pre-computed value to add.
-                var l = i - wind + 1;
-
-                while (getBit(x, l) == 0) {
-                    l++;
-                }
-
-                var indx = 0;
-                for (j = l; j <= i; j++) {
-                    indx += getBit(x, j) << (j - l);
-                    out = montMul(out, out);
-                }
-
-                out = montMul(out, precomp[indx]);
-
-                i = l - 1;
-            }
-        }
-
-        return montOut(out);
-    },
-
-    trim: function () {
-        var l = this.limbs, p;
-        do {
-            p = l.pop();
-        } while (l.length && p === 0);
-        l.push(p);
-        return this;
-    },
-
-    /** Propagate carries. */
-    normalize: function () {
-        var carry = 0, i,
-            pv = secp256k1.sjcl.bn.placeVal,
-            ipv = secp256k1.sjcl.bn.ipv, l, m,
-            limbs = this.limbs,
-            ll = limbs.length,
-            mask = secp256k1.sjcl.bn.radixMask;
-        for (i = 0; i < ll || (carry !== 0 && carry !== -1); i++) {
-            l = (limbs[i] || 0) + carry;
-            m = limbs[i] = l & mask;
-            carry = (l - m) * ipv;
-        }
-        if (carry === -1) {
-            limbs[i - 1] -= pv;
-        }
-        this.trim();
-        return this;
-    },
-
-    /**
-     * Serialize to a bit array
-     * @param {number=} length Optional length to specify (defaults to the bitLength of this object)
-     * @returns {!Array<number>}
-     */
-    toBits: function (length) {
-        this.normalize();
-        var len = length ? length : this.bitLength();
-        var i = Math.floor((len - 1) / 24), w = secp256k1.sjcl.bitArray,
-            e = (len + 7 & -8) % secp256k1.sjcl.bn.radix || secp256k1.sjcl.bn.radix,
-            out = [w.partial(e, this.getLimb(i))];
-        for (i--; i >= 0; i--) {
-            out = w.concat(out, [w.partial(Math.min(secp256k1.sjcl.bn.radix, len), this.getLimb(i))]);
-            len -= secp256k1.sjcl.bn.radix;
-        }
-        return out;
     }
+
+    return out;
 };
 
+//noinspection JSUnusedGlobalSymbols
+/**
+ * this ^ x mod N
+ * @param {string|number|secp256k1.sjcl.bn} x Exponent to raise to
+ * @param {string|number|secp256k1.sjcl.bn} N Modulus
+ * @returns {secp256k1.sjcl.bn}
+ */
+secp256k1.sjcl.bn.prototype.powermod= function (x, N) {
+    x = new secp256k1.sjcl.bn(x);
+    N = new secp256k1.sjcl.bn(N);
+
+    // Jump to montpowermod if possible.
+    if ((N.limbs[0] & 1) == 1) {
+        var montOut = this.montpowermod(x, N);
+
+        if (montOut != false) {
+            return montOut;
+        } // else go to slow powermod
+    }
+
+    var i, j, l = x.normalize().trim().limbs, out = new secp256k1.sjcl.bn(1), pow = this;
+
+    for (i = 0; i < l.length; i++) {
+        for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
+            //noinspection JSBitwiseOperatorUsage
+            if (l[i] & (1 << j)) {
+                out = out.mulmod(pow, N);
+            }
+            if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
+                break;
+            }
+
+            pow = pow.mulmod(pow, N);
+        }
+    }
+
+    return out;
+};
+
+/**
+ * this ^ x mod N with Montgomery reduction
+ * @param {string|number|secp256k1.sjcl.bn} x Exponent to raise to
+ * @param {string|number|secp256k1.sjcl.bn} N Modulus
+ * @returns {secp256k1.sjcl.bn}
+ */
+secp256k1.sjcl.bn.prototype.montpowermod = function (x, N) {
+    x = new secp256k1.sjcl.bn(x).normalize().trim();
+    N = new secp256k1.sjcl.bn(N);
+
+    var i, j,
+        radix = secp256k1.sjcl.bn.radix,
+        out = new secp256k1.sjcl.bn(1),
+        pow = this.copy();
+
+    // Generate R as a cap of N.
+    var R, s, wind, bitsize = x.bitLength();
+
+    R = N.copy().normalize().trim();
+    for (i = 0 ; i < R.limbs.length ; i++) {
+        R.limbs[i] = 0;
+    }
+
+    for (s = secp256k1.sjcl.bn.radix; s > 0; s--) {
+        if (((N.limbs[N.limbs.length - 1] >> s) & 1) == 1) {
+            R.limbs[R.limbs.length - 1] = 1 << s;
+            break;
+        }
+    }
+
+    // Calculate window size as a function of the exponent's size.
+    if (bitsize == 0) {
+        return this;
+    } else if (bitsize < 18) {
+        wind = 1;
+    } else if (bitsize < 48) {
+        wind = 3;
+    } else if (bitsize < 144) {
+        wind = 4;
+    } else if (bitsize < 768) {
+        wind = 5;
+    } else {
+        wind = 6;
+    }
+
+    // Find R' and N' such that R * R' - N * N' = 1.
+    var RR = R.copy(), NN = N.copy(), RP = new secp256k1.sjcl.bn(1), NP = new secp256k1.sjcl.bn(0), RT = R.copy();
+
+    while (RT.greaterEquals(1)) {
+        RT.halveM();
+
+        if ((RP.limbs[0] & 1) == 0) {
+            RP.halveM();
+            NP.halveM();
+        } else {
+            RP.addM(NN);
+            RP.halveM();
+
+            NP.halveM();
+            NP.addM(RR);
+        }
+    }
+
+    RP = RP.normalize();
+    NP = NP.normalize();
+
+    RR.doubleM();
+    var R2 = RR.mulmod(RR, N);
+
+
+    if (!RR.mul(RP).sub(N.mul(NP)).equals(1)) {
+        throw new Error("Cannot perform Montgomery reduction on this modulus.");
+    }
+
+    var montIn = function (c) {
+            return montMul(c, R2);
+        },
+        montMul = function (a, b) {
+            // Standard Montgomery reduction
+            var k, ab, right, abBar, mask = (1 << (s + 1)) - 1;
+            ab = a.mul(b);
+
+            right = ab.mul(NP);
+            right.limbs = right.limbs.slice(0, R.limbs.length);
+
+            if (right.limbs.length == R.limbs.length) {
+                right.limbs[R.limbs.length - 1] &= mask;
+            }
+
+            right = right.mul(N);
+
+            abBar = ab.add(right).normalize().trim();
+            abBar.limbs = abBar.limbs.slice(R.limbs.length - 1);
+
+            // Division.  Equivelent to calling *.halveM() s times.
+            for (k = 0; k < abBar.limbs.length; k++) {
+                if (k > 0) {
+                    abBar.limbs[k - 1] |= (abBar.limbs[k] & mask) << (radix - s - 1);
+                }
+
+                abBar.limbs[k] = abBar.limbs[k] >> (s + 1);
+            }
+
+            if (abBar.greaterEquals(N)) {
+                abBar.subM(N);
+            }
+
+            return abBar;
+        },
+        montOut = function (c) {
+            return montMul(c, 1);
+        };
+
+    pow = montIn(pow);
+    out = montIn(out);
+
+    // Sliding-Window Exponentiation (HAC 14.85)
+    var h, precomp = {}, cap = (1 << (wind - 1)) - 1;
+
+    precomp[1] = pow.copy();
+    precomp[2] = montMul(pow, pow);
+
+    for (h = 1; h <= cap; h++) {
+        precomp[(2 * h) + 1] = montMul(precomp[(2 * h) - 1], precomp[2]);
+    }
+
+    var getBit = function (exp, i) { // Gets ith bit of exp.
+        var off = i % secp256k1.sjcl.bn.radix;
+
+        return (exp.limbs[Math.floor(i / secp256k1.sjcl.bn.radix)] & (1 << off)) >> off;
+    };
+
+    for (i = x.bitLength() - 1; i >= 0;) {
+        if (getBit(x, i) == 0) {
+            // If the next bit is zero:
+            //   Square, move forward one bit.
+            out = montMul(out, out);
+            i = i - 1;
+        } else {
+            // If the next bit is one:
+            //   Find the longest sequence of bits after this one, less than `wind`
+            //   bits long, that ends with a 1.  Convert the sequence into an
+            //   integer and look up the pre-computed value to add.
+            var l = i - wind + 1;
+
+            while (getBit(x, l) == 0) {
+                l++;
+            }
+
+            var indx = 0;
+            for (j = l; j <= i; j++) {
+                indx += getBit(x, j) << (j - l);
+                out = montMul(out, out);
+            }
+
+            out = montMul(out, precomp[indx]);
+
+            i = l - 1;
+        }
+    }
+
+    return montOut(out);
+};
+
+/**
+ * Normalize a bn by propogating its carries.
+ * @returns {secp256k1.sjcl.bn}
+ */
+secp256k1.sjcl.bn.prototype.normalize = function () {
+    var carry = 0, i,
+        pv = secp256k1.sjcl.bn.placeVal,
+        ipv = secp256k1.sjcl.bn.ipv, l, m,
+        limbs = this.limbs,
+        ll = limbs.length,
+        mask = secp256k1.sjcl.bn.radixMask;
+    for (i = 0; i < ll || (carry !== 0 && carry !== -1); i++) {
+        l = (limbs[i] || 0) + carry;
+        m = limbs[i] = l & mask;
+        carry = (l - m) * ipv;
+    }
+    if (carry === -1) {
+        limbs[i - 1] -= pv;
+    }
+    this.trim();
+    return this;
+};
+
+/**
+ * Serialize to a bit array
+ * @param {number=} length Optional length to specify (defaults to the bitLength of this object)
+ * @returns {Array<number>}
+ */
+secp256k1.sjcl.bn.prototype.toBits = function (length) {
+    this.normalize();
+    var len = length ? length : this.bitLength();
+    var i = Math.floor((len - 1) / 24), w = secp256k1.sjcl.bitArray,
+        e = (len + 7 & -8) % secp256k1.sjcl.bn.radix || secp256k1.sjcl.bn.radix,
+        out = [w.partial(e, this.getLimb(i))];
+    for (i--; i >= 0; i--) {
+        out = w.concat(out, [w.partial(Math.min(secp256k1.sjcl.bn.radix, len), this.getLimb(i))]);
+        len -= secp256k1.sjcl.bn.radix;
+    }
+    return out;
+};
+
+/**
+ * Trim 0s in the limbs of a BigNum
+ * @returns {secp256k1.sjcl.bn}
+ */
+secp256k1.sjcl.bn.prototype.trim = function () {
+    var l = this.limbs, p;
+    do {
+        p = l.pop();
+    } while (l.length && p === 0);
+    l.push(p);
+    return this;
+};
 
 /**
  * this * that mod N
@@ -499,7 +518,7 @@ secp256k1.sjcl.bn.prototype.mul = function (that) {
         bl = b.length,
         out = new secp256k1.sjcl.bn(null),
         c = out.limbs, ai,
-        ii = this.maxMul;
+        ii = secp256k1.sjcl.bn.maxMul;
 
     for (i = 0; i < this.limbs.length + that.limbs.length + 1; i++) {
         c[i] = 0;
@@ -511,7 +530,7 @@ secp256k1.sjcl.bn.prototype.mul = function (that) {
         }
 
         if (!--ii) {
-            ii = this.maxMul;
+            ii = secp256k1.sjcl.bn.maxMul;
             out.cnormalize();
         }
     }
