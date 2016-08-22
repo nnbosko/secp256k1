@@ -1,4 +1,4 @@
-(defproject secp256k1 "1.0.1"
+(defproject secp256k1 "1.0.2"
   :license {:name "MIT"
             :url "http://opensource.org/licenses/MIT"
             :distribution :repo}

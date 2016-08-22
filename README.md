@@ -9,7 +9,7 @@ Simply include in your `project.clj` file:
 
 ```
 :repositories [["jitpack" "https://jitpack.io"]]
-:dependencies [[com.github.Sepia-Officinalis/secp256k1 "1.0.0"]]
+:dependencies [[com.github.Sepia-Officinalis/secp256k1 "1.0.2"]]
 ```
 
 ## Info
@@ -19,11 +19,12 @@ This is a library implements elliptic curve cryptography for [secp256k1](https:/
 The goals of this project are as follows:
 
 ✅ Isomorphic Clojure ⇔ ClojureScript compatibility testing<br/>
-✅ Support advanced compilation under ClojureScript<br/>
+✅ Advanced compilation under ClojureScript<br/>
+❌ Support deterministic ECDSA signatures via [RFC6797](https://tools.ietf.org/html/rfc6979)<br/>
 ❌ Allow for the user to access browser native cryptographic primitives in [`crypto.subtle`](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) via Clojure's own `core.async`.<br/>
 ❌ Wrap the libsecp256k1 JNI provided by [BitCoin Core](https://github.com/bitcoin-core/secp256k1/tree/master/src/java)<br/>
 ❌ [Diffie-Helman](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange) shared secrets<br/>
-❌ Implement BitCoin's [_recovery id_](https://github.com/bitcoin-core/secp256k1/blob/269d4227038b188128353235a272a8f030c307b1/include/secp256k1_recovery.h#L28) for compressed signatures<br/>
+❌ Support BitCoin's [_recovery id_](https://github.com/bitcoin-core/secp256k1/blob/269d4227038b188128353235a272a8f030c307b1/include/secp256k1_recovery.h#L28) for compressed signatures<br/>
 
 ## Testing
 
