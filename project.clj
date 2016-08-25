@@ -8,9 +8,9 @@
   :jar-exclusions [#"\.DS_Store"]
   :source-paths ["src/clj" "src/cljs" "src/cljc" "src/js"]
   :test-paths ["test"]
-  :dependencies [[org.bouncycastle/bcprov-jdk15on "1.54"]
+  :dependencies [[org.bouncycastle/bcprov-jdk15on "1.55"]
                  [org.clojure/clojure "1.9.0-alpha10"]
-                 [org.clojure/clojurescript "1.9.198"]]
+                 [org.clojure/clojurescript "1.9.225"]]
 
 
   :clean-targets ^{:protect false}
