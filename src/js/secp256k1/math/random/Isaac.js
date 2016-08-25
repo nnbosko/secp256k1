@@ -268,7 +268,7 @@ secp256k1.math.random.Isaac = function () {
     }
 
 
-    /* public: return internals in an object*/
+    /* public: return internals in an object */
     function internals() {
         return {
             a: acc,
