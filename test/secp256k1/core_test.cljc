@@ -1,5 +1,6 @@
 (ns secp256k1.core-test
   (:require [secp256k1.core :as secp256k1]
+            [secp256k1.formatting.base-convert :as convert]
             #?(:clj  [clojure.test
                       :refer [is use-fixtures
                               testing are run-tests deftest]]
@@ -61,6 +62,38 @@
              secp256k1/private-key
              (secp256k1/x962-encode :compressed false)))
       "Public key should start with a leading zero (uncompressed)"))
+
+(deftest x962-encode-different-bases-test
+  (is (= "BAC/Dji4Yyn4TqkJcuD5AdXqAUXx66yMUP3td3ltenDhvp4AG37OBx+zmGtelmmf4o297siVZoLaeKX2oRW58Uw="
+         (-> "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
+             secp256k1/public-key
+             (secp256k1/x962-encode :compressed false
+                                    :output-format :base64)))
+      "Base 64")
+  (is (= "BAC/Dji4Yyn4TqkJcuD5AdXqAUXx66yMUP3td3ltenDhvp4AG37OBx+zmGtelmmf4o297siVZoLaeKX2oRW58Uw="
+         (-> "BAC/Dji4Yyn4TqkJcuD5AdXqAUXx66yMUP3td3ltenDhvp4AG37OBx+zmGtelmmf4o297siVZoLaeKX2oRW58Uw="
+             (secp256k1/public-key :base64)
+             (secp256k1/x962-encode :compressed false
+                                    :output-format :base64)))
+      "Base 64 (input)")
+  (is (= "MVJW3Nbw27JppJfCfMVWfi6FWBkrk47rt8vsUTQp8WYM4U7jStxkYLaPCP5YvJ8hphYsVpRQuiXah5uWEi95SVLf"
+         (-> "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
+             secp256k1/public-key
+             (secp256k1/x962-encode :compressed false
+                                    :output-format :base58)))
+      "Base 58")
+  (is (= "MVJW3Nbw27JppJfCfMVWfi6FWBkrk47rt8vsUTQp8WYM4U7jStxkYLaPCP5YvJ8hphYsVpRQuiXah5uWEi95SVLf"
+         (-> "MVJW3Nbw27JppJfCfMVWfi6FWBkrk47rt8vsUTQp8WYM4U7jStxkYLaPCP5YvJ8hphYsVpRQuiXah5uWEi95SVLf"
+             (secp256k1/public-key :base58)
+             (secp256k1/x962-encode :compressed false
+                                    :output-format :base58)))
+      "Base 58 (input)")
+  (is (= "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
+         (-> "0400bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"
+             (convert/base-to-byte-array :hex)
+             (secp256k1/public-key :hex)
+             (secp256k1/x962-encode :compressed false
+                                    :output-format :hex)))))
 
 (deftest public-private-key-equality
   (testing "Checking that equality works for private-keys"
@@ -262,7 +295,6 @@
         "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
         "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5"))))
 
-;; TODO: Sad paths where verify-signature and sign should throw
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
     (let [priv-key (secp256k1/private-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c")]
@@ -287,6 +319,21 @@
         "금조류(琴鳥類, lyrebird)는 오스트레일리아 남부에 사는 참새목의 한 부류로, 주변의 소리를 잘 따라한다. 거문고새라고도 한다."
 
         "コトドリ属（コトドリぞく、学名 Menura）はコトドリ上科コトドリ科 Menuridae に属する鳥の属の一つ。コトドリ科は単型である。")))
+
+  (testing "Bad public-key does not verify"
+    (is
+     (secp256k1/verify-signature
+      "0333952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
+      "foo"
+      "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567")
+     "Happy path")
+    (is
+     (thrown? #?(:clj Throwable :cljs js/Error)
+      (secp256k1/verify-signature
+       "0333952d51e42f7eb05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58"
+       "foo"
+       "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567")))
+    "Corrupted bit")
 
   (testing "Reference signatures"
     (let [priv-key "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
@@ -355,6 +402,50 @@
         "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
         ))))
 
+(deftest deterministic-signatures
+  (testing "Can verify a deterministic signature"
+    (is (= true
+           (let [pk (secp256k1/private-key
+                     "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0")
+                 input "foo"
+                 sig "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"]
+             (secp256k1/verify-signature pk input sig)))))
+  ;; TODO: Port to ClojureScript
+  #?(:clj
+     (testing "Can make a signature in accordance with RFC 6979"
+       (is (= "1c3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
+              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                  secp256k1/private-key
+                  ;; TODO: Fix verify so it checks the recovery-byte if it is present
+                  (secp256k1/sign "foo" :recovery-byte? true)))
+           "Recovery byte present (signing \"foo\")")
+       (is (= "1b3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                  secp256k1/private-key
+                  (secp256k1/sign "barr" :recovery-byte? true)))
+           "Recovery byte present (signing \"bar\")")
+       (is (= "3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                  secp256k1/private-key
+                  (secp256k1/sign "barr" :recovery-byte? false)))
+           "Recovery byte *NOT* present (signing \"bar\")")
+       (is (= "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
+              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                  secp256k1/private-key
+                  ;; TODO: Fix verify so it checks the recovery-byte if it is present
+                  (secp256k1/sign "foo" :recovery-byte? false)))
+           "Recovery byte *NOT* present (signing \"foo\")"))))
+
+(deftest recovery-byte-tests
+  #?(:clj
+     (testing "Can recover a public key from a signature with a recovery byte"
+       (is  (= (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0" secp256k1/private-key secp256k1/public-key)
+                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                    secp256k1/private-key
+                    (secp256k1/sign "foo" :recovery-byte? true)
+                    (->> (secp256k1/recover-public-key "foo"))))))))
+
+;; TODO: test different input formats
 (deftest sin-tests
   (testing "Reference sins are valid"
     (are [x] (= (secp256k1/validate-sin x) true)
@@ -381,6 +472,7 @@
       "TfBZ3DacgxVbem&&ggEXZtHxoNXgD5FWi2cLD"
       "1111TfFc5NFFY6EsGcY6xe6vSct2hCWzk25X")))
 
+;; TODO: test different output formats
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
     (let [{:keys [:priv :pub :sin]} (secp256k1/generate-sin)]
