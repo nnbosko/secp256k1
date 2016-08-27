@@ -72,6 +72,13 @@
        "Private key should be less than or equal to the curve modulus")
      priv-key))
 
+  array ; byte-array
+  (private-key
+    ([priv-key _]
+     (private-key priv-key))
+    ([priv-key]
+     (private-key (base-to-base priv-key :bytes :biginteger))))
+
   string
   (private-key
     ([this base]
