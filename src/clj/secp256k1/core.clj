@@ -17,6 +17,8 @@
            org.bouncycastle.crypto.params.ECDomainParameters
            org.bouncycastle.crypto.params.ECKeyGenerationParameters
            org.bouncycastle.crypto.params.ECPublicKeyParameters
+           org.bouncycastle.crypto.signers.HMacDSAKCalculator
+           org.bouncycastle.crypto.signers.ECDSASigner
            org.bouncycastle.math.ec.ECAlgorithms))
 
 (defonce
@@ -165,7 +167,7 @@
   If no digest is specified this defaults to SHA256
 
   Returns an object with a method `.nextK` for getting new random values"
-  ([priv-key, ^ECDomainParameters curve, #^bytes hash,]
+  ([priv-key, ^ECDomainParameters curve, #^bytes hash]
    (deterministic-k-generator priv-key curve hash SHA256Digest))
   ([priv-key, ^ECDomainParameters curve, #^bytes hash, ^GeneralDigest digest]
    (assert (= (count hash)
@@ -191,11 +193,11 @@
   [priv-key data & {:keys [input-format
                            output-format
                            private-key-format
-                           recovery-byte?]
+                           recovery-byte]
                     :or   {input-format :hex
                            private-key-format :hex
                            output-format :hex
-                           recovery-byte? true}}]
+                           recovery-byte true}}]
   (let [input    (base-to-byte-array data input-format)
         priv-key (private-key priv-key private-key-format)
         rng      (deterministic-k-generator priv-key curve input)
@@ -217,7 +219,7 @@
         (if (or (zero? r) (zero? s))
           (recur)
           (-> {:R r :S s
-               :recover (when recovery-byte? (compute-recovery-byte kp r s_))}
+               :recover (when recovery-byte (compute-recovery-byte kp r s_))}
               (DER-encode-ECDSA-signature :input-format :biginteger
                                           :output-format output-format)))))))
 
@@ -225,18 +227,18 @@
   "Sign some data with a private-key"
   [priv-key data & {:keys [output-format
                            private-key-format
-                           recovery-byte?]
+                           recovery-byte]
                     :or   {private-key-format :hex
                            output-format :hex
-                           recovery-byte? false}}]
+                           recovery-byte true}}]
   (sign-hash priv-key (sha256 data)
              :input-format :bytes
              :private-key-format private-key-format
              :output-format output-format
-             :recovery-byte? recovery-byte?))
+             :recovery-byte recovery-byte))
 
-(defn- y-coordinate
-  "Compute the y-coordinate for a given x-coordinate"
+(defn- compute-point
+  "Compute an elliptic curve point for a y-coordinate parity and x-coordinate"
   [y-even? x-coordinate]
   (let [raw (->> x-coordinate
                  biginteger
@@ -249,13 +251,14 @@
                       (System/arraycopy
                        raw 0
                        out (- l (count raw))
-                       (count raw))))]
+                       (count raw))
+                      out))]
     (-> (cons (if y-even? 0x02 0x03) input)
         byte-array
         public-key)))
 
 (defn ecrecover
-  "Given the components of a signature and a selector value,
+  "Given the components of a signature and a recovery value,
   recover and return the public key that generated the
   signature according to the algorithm in SEC1v2 section 4.1.6"
   [hash recovery-byte r s]
@@ -274,7 +277,7 @@
                                  (- 0x1B)
                                  (bit-shift-right 1)))
         n (.getN curve)
-        R (y-coordinate y-even? (if is-second-key? (.add r n) r))
+        R (compute-point y-even? (if is-second-key? (.add r n) r))
         e-inv (.subtract n (BigInteger. 1 hash))
         r-inv (.modInverse r n)]
     (-> (ECAlgorithms/sumOfTwoMultiplies (.getG curve) e-inv R s)
@@ -286,9 +289,10 @@
   [hash signature & {:keys [input-format]
                      :or   {input-format :hex}}]
   (let [{:keys [recover R S]}
-        (DER-decode-ECDSA-signature signature
-                                    :input-format input-format
-                                    :output-format :biginteger)
+        (DER-decode-ECDSA-signature
+         signature
+         :input-format input-format
+         :output-format :biginteger)
         hash (base-to-byte-array hash input-format)]
     (ecrecover hash recover R S)))
 
@@ -305,34 +309,31 @@
 (defn verify-ECDSA-signature-from-hash
   "Verifies the given ASN.1 encoded ECDSA signature against a hash using a specified public key"
   [key hash signature
-   & {:keys [input-format]
-      :or   {input-format :hex}}]
+   & {:keys [input-format public-key-format]
+      :or   {input-format      :hex
+             public-key-format :hex}}]
   (let [bouncy-pub-key (-> key
-                           (public-key input-format)
-                           (ECPublicKeyParameters. curve))]
-    (try
-      (let [verifier (doto (ECDSASigner.) (.init false bouncy-pub-key))
-            {r :R, s :S} (DER-decode-ECDSA-signature
-                          signature
-                          :input-format input-format
-                          :output-format :biginteger)]
-        (.verifySignature
-         verifier
-         (base-to-byte-array hash input-format)
-         r
-         s))
-      (catch Throwable _ false))))
+                           (public-key public-key-format)
+                           (ECPublicKeyParameters. curve))
+        verifier (doto (ECDSASigner.) (.init false bouncy-pub-key))
+        {r :R, s :S} (DER-decode-ECDSA-signature
+                      signature
+                      :input-format input-format
+                      :output-format :biginteger)]
+    (.verifySignature
+     verifier
+     (base-to-byte-array hash input-format) r s)))
 
 (defn verify-signature-from-hash
   "Verifies the given ASN.1 encoded ECDSA signature against a hash using a specified public key"
-  [key hash signature & {:keys [input-format]
-                         :or   {input-format :hex}}]
-  (let [pub-key (public-key key input-format)
-        input (base-to-byte-array hash input-format)
-        sig-bytes (base-to-byte-array signature input-format)
-        [head1 head2] (take 2 signature)]
-    (cond (and (#{0x1B 0x1C 0x1D 0x1E} head1)
-               (= head2 0x30))
+  [key hash signature & {:keys [input-format public-key-format]
+                         :or   {input-format      :hex
+                                public-key-format :hex}}]
+  (let [pub-key       (public-key key public-key-format)
+        input         (base-to-byte-array hash input-format)
+        sig-bytes     (base-to-byte-array signature input-format)
+        [head1 head2] (take 2 sig-bytes)]
+    (cond (and (#{0x1B 0x1C 0x1D 0x1E} head1) (= head2 0x30))
           (= pub-key
              (recover-public-key-from-hash input sig-bytes
                                            :input-format :bytes))
@@ -349,16 +350,15 @@
 
 (defn verify-signature
   "Verifies that the SHA256 hash of a string of data has been signed"
-  [key data hex-signature & {:keys [input-format]
-                             :or   {input-format :hex}}]
-  (let [pub-key (public-key key input-format)]
-    (try
-      (verify-signature-from-hash
-       pub-key
-       (byte-array-to-base (sha256 data) :bytes)
-       (base-to-base hex-signature input-format :bytes)
-       :input-format :bytes)
-      (catch Throwable _ false))))
+  [key data signature & {:keys [input-format public-key-format]
+                         :or   {input-format      :hex
+                                public-key-format :hex}}]
+  (verify-signature-from-hash
+   (public-key key input-format)
+   (byte-array-to-base (sha256 data) :bytes)
+   (base-to-base signature input-format :bytes)
+   :input-format      :bytes
+   :public-key-format public-key-format))
 
 (defn validate-sin
   "Verify that a SIN is valid"

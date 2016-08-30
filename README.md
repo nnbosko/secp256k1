@@ -1,5 +1,5 @@
 # Secp256k1
-*A Clojure(Script) Crytography Library*
+*A Clojure(Script) Cryptography Library*
 
 [![Build Status](https://travis-ci.org/Sepia-Officinalis/secp256k1.svg)](https://travis-ci.org/Sepia-Officinalis/secp256k1)
 
@@ -12,6 +12,8 @@ Simply include in your `project.clj` file:
 :dependencies [[com.github.Sepia-Officinalis/secp256k1 "1.0.2"]]
 ```
 
+Note that only Java 8+ is support.
+
 ## Info
 
 This is a library implements elliptic curve cryptography for [secp256k1](https://en.bitcoin.it/wiki/Secp256k1), the elliptic curve used by BitCoin.
@@ -20,11 +22,11 @@ The goals of this project are as follows:
 
 ✅ Isomorphic Clojure ⇔ ClojureScript compatibility testing<br/>
 ✅ Advanced compilation under ClojureScript<br/>
-❌ Support deterministic ECDSA signatures via [RFC6797](https://tools.ietf.org/html/rfc6979)<br/>
-❌ Allow for the user to access browser native cryptographic primitives in [`crypto.subtle`](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) via Clojure's own `core.async`.<br/>
+✅ Deterministic ECDSA signatures via [RFC 6979](https://tools.ietf.org/html/rfc6979)<br/>
+✅ Support BitCoin's [_recovery id_](https://github.com/bitcoin-core/secp256k1/blob/269d4227038b188128353235a272a8f030c307b1/include/secp256k1_recovery.h#L28) for compressed signatures<br/>
+❌ Access to browser native cryptographic primitives in [`crypto.subtle`](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) via Clojure's own `core.async`.<br/>
 ❌ Wrap the libsecp256k1 JNI provided by [BitCoin Core](https://github.com/bitcoin-core/secp256k1/tree/master/src/java)<br/>
 ❌ [Diffie-Helman](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange) shared secrets<br/>
-❌ Support BitCoin's [_recovery id_](https://github.com/bitcoin-core/secp256k1/blob/269d4227038b188128353235a272a8f030c307b1/include/secp256k1_recovery.h#L28) for compressed signatures<br/>
 
 ## Testing
 

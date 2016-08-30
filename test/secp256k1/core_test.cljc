@@ -317,6 +317,21 @@
         "033502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9"
         "0387efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5"))))
 
+
+#?(:cljs
+   (deftest deterministic-generate-k-test
+     (testing "Generate a k deterministically"
+       (is (= "010497d369b3d525ca15ec29c104a694210bb59ff6cabfc10afe6df0283896df"
+              (convert/base-to-base (secp256k1/deterministic-generate-k "1" [])
+                                    :biginteger
+                                    :hex)))
+       (is (= "0ac9323d1d29458f8e0a3a36b0634edadec5c62b38c49995f038a168677538c0"
+              (convert/base-to-base (secp256k1/deterministic-generate-k
+                                     "111111111111111111111111111111111111111111111111111" [])
+                                    :biginteger
+                                    :hex))))))
+
+
 (deftest sign-tests
   (testing "Signed messages can be checked with a proper pub key"
     (let [priv-key (secp256k1/private-key "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c")]
@@ -395,7 +410,9 @@
           (secp256k1/private-key
            "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0")
           pub-key (secp256k1/public-key priv-key)]
-      (are [x y] (not (secp256k1/verify-signature pub-key x y))
+      (are [x y] (thrown? #?(:clj Throwable
+                             :cljs js/Error)
+                          (secp256k1/verify-signature pub-key x y))
         5
         "3044022045bc5aba353f97316b92996c01eba6e0b0cb63a763d26898a561c748a9545c7502204dc0374c8d4ca489c161b21ff5e25714f1046d759ec9adf9440233069d584567",
 
@@ -432,49 +449,50 @@
                  input "foo"
                  sig "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"]
              (secp256k1/verify-signature pk input sig)))))
-  ;; TODO: Port to ClojureScript
-  #?(:clj
-     (testing "Can make a signature in accordance with RFC 6979"
-       (is (= "1c3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
-              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                  secp256k1/private-key
-                  (secp256k1/sign "foo" :recovery-byte? true)))
-           "Recovery byte present (signing \"foo\")")
-       (is (= "1b3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
-              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                  secp256k1/private-key
-                  (secp256k1/sign "barr" :recovery-byte? true)))
-           "Recovery byte present (signing \"bar\")")
-       (is (= "3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
-              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                  secp256k1/private-key
-                  (secp256k1/sign "barr" :recovery-byte? false)))
-           "Recovery byte *NOT* present (signing \"bar\")")
-       (is (= "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
-              (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                  secp256k1/private-key
-                  (secp256k1/sign "foo" :recovery-byte? false)))
-           "Recovery byte *NOT* present (signing \"foo\")")
-       (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
-              (secp256k1/sign
-               15725956524294756896617195236714279137776563997000161914293412353185226569129
-               "trololololol"
-               :recovery-byte? true))))))
+  (testing "Can make a signature in accordance with RFC 6979"
+    (is (= "1c3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
+           (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+               secp256k1/private-key
+               (secp256k1/sign "foo" :recovery-byte true)))
+        "Recovery byte present (signing \"foo\")")
+              (is (= "1b3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                    secp256k1/private-key
+                    (secp256k1/sign "barr" :recovery-byte true)))
+             "Recovery byte present (signing \"bar\")")
+         (is (= "3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                    secp256k1/private-key
+                    (secp256k1/sign "barr" :recovery-byte false)))
+             "Recovery byte *NOT* present (signing \"bar\")")
+         (is (= "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
+                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+                    secp256k1/private-key
+                    (secp256k1/sign "foo" :recovery-byte false)))
+             "Recovery byte *NOT* present (signing \"foo\")")
+         (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
+                (secp256k1/sign
+                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+                 "trololololol"
+                 :recovery-byte true)))
+         (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
+                (secp256k1/sign
+                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+                 "trololololol")))))
 
 (deftest recovery-byte-tests
-  #?(:clj
-     (testing "Can recover a public key from a signature with a recovery byte"
-       (is  (= (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0" secp256k1/private-key secp256k1/public-key)
-               (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                   secp256k1/private-key
-                   (secp256k1/sign "foo" :recovery-byte? true)
-                   (->> (secp256k1/recover-public-key "foo")))))
-       (is (= (secp256k1/public-key
-               (secp256k1/private-key
-                "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
-              (secp256k1/recover-public-key
-               "trololololol"
-               "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"))))))
+  (testing "Can recover a public key from a signature with a recovery byte"
+    (is (= (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0" secp256k1/private-key secp256k1/public-key)
+           (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+               secp256k1/private-key
+               (secp256k1/sign "foo" :recovery-byte true)
+               (->> (secp256k1/recover-public-key "foo")))))
+    (is (= (secp256k1/public-key
+            (secp256k1/private-key
+             "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
+           (secp256k1/recover-public-key
+            "trololololol"
+            "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf")))))
 
 ;; TODO: test different input formats
 (deftest sin-tests
@@ -516,9 +534,8 @@
       (is (instance? ECPoint pub))
       (is (instance? #?(:cljs bn
                         :clj  java.math.BigInteger) priv))
-      ;; TODO: Why doesn't this work with a pub-key?
       (are [x] (secp256k1/verify-signature
-                priv x
+                pub x
                 (secp256k1/sign priv x))
         "trololololol"
         "TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
