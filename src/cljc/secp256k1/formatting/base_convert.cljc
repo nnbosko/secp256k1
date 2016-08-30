@@ -55,20 +55,20 @@
      [s]
      (assert (base58? s) "Input must be in base 58")
      (let [padding (->> s
-                     (take-while
-                       #(= % (first base-fifty-eight-chars)))
-                     (map (constantly 0)))]
+                        (take-while
+                         #(= % (first base-fifty-eight-chars)))
+                        (map (constantly 0)))]
        (loop [result 0, s s]
          (if-not (empty? s)
            (recur (+ (*' result 58)
-                    (.indexOf base-fifty-eight-chars (str (first s))))
-             (rest s))
+                     (.indexOf base-fifty-eight-chars (str (first s))))
+                  (rest s))
            (->> result
-             .toBigInteger
-             .toByteArray
-             (drop-while zero?)
-             (concat padding)
-             byte-array)))))
+                .toBigInteger
+                .toByteArray
+                (drop-while zero?)
+                (concat padding)
+                byte-array)))))
    :cljs
    (defn base58-to-hex
      "Encodes a base 58 string as a hexadecimal string"
@@ -94,19 +94,19 @@
    (defn bytes? [x]
      "Predicate to determine that whether something is an unsigned sequence of bytes"
      (and (or (implements? ISeqable x) (array? x))
-       (every? int? x)
-       (every? #(and (<= 0 %) (<= % 255))
-         (map #(unsigned-bit-shift-right % 0) x)))))
+          (every? int? x)
+          (every? #(and (<= 0 %) (<= % 255))
+                  (map #(unsigned-bit-shift-right % 0) x)))))
 
 (defn base-to-byte-array
   "Convert a string of specified base to a byte-array"
   [data format]
   (case format
     :biginteger #?(:clj  (->> data
-                             biginteger
-                             .toByteArray
-                             (drop-while zero?)
-                             byte-array)
+                              biginteger
+                              .toByteArray
+                              (drop-while zero?)
+                              byte-array)
                    :cljs (->> data (new bn) .toBits bytes/fromBits))
     :hex        #?(:clj  (DatatypeConverter/parseHexBinary data)
                    :cljs (do
@@ -140,9 +140,9 @@
                  s (nth base-fifty-eight-chars i)]
              (recur (cons s acc) (quot n 58)))
            (apply str (concat
-                        (repeat leading-zeros
-                                (first base-fifty-eight-chars))
-                        acc))))))
+                       (repeat leading-zeros
+                               (first base-fifty-eight-chars))
+                       acc))))))
    :cljs
    (let [fifty-eight (Integer/fromInt 58)]
      (defn hex-to-base58
@@ -157,8 +157,8 @@
                    s (nth base-fifty-eight-chars i)]
                (recur (cons s acc) (.divide n fifty-eight)))
              (apply str (concat
-                          (repeat leading-zeros (first base-fifty-eight-chars))
-                          acc))))))))
+                         (repeat leading-zeros (first base-fifty-eight-chars))
+                         acc))))))))
 
 (defn byte-array-to-base
   [data output-format]
@@ -189,16 +189,16 @@
      [data]
      (assert (hex? data) "Input must be hexadecimal")
      (-> data
-       DatatypeConverter/parseHexBinary
-       byte-array-to-base58)))
+         DatatypeConverter/parseHexBinary
+         byte-array-to-base58)))
 
 #?(:clj
    (defn base58-to-hex
      "Encodes a base58-string as a hex-string"
      [data]
      (-> data
-       base58-to-byte-array
-       (byte-array-to-base :hex))))
+         base58-to-byte-array
+         (byte-array-to-base :hex))))
 
 (defn base-to-base
   "Convert one base into another"
@@ -211,14 +211,14 @@
     data
 
     (= [:base58 :hex]
-      [input-format output-format])
+       [input-format output-format])
     (base58-to-hex data)
 
     (= [:hex :base58]
-      [input-format output-format])
+       [input-format output-format])
     (hex-to-base58 data)
 
     :else
     (-> data
-      (base-to-byte-array input-format)
-      (byte-array-to-base output-format))))
+        (base-to-byte-array input-format)
+        (byte-array-to-base output-format))))
