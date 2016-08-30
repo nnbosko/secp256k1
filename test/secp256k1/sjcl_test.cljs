@@ -199,6 +199,14 @@
               (.add (-> G-Jac .negate .toAffine))
               .toAffine)))
       "Adding a point to its inverse (calculated using Jacobian coordinates) yields the identity"))
+  (testing "Can run mult2 on a point"
+    (is (= (-> ecc-curves/k256.G
+             (.mult 3)
+             .toJac
+             (.add (.mult ecc-curves/k256.G 5))
+             .toAffine
+             .-x .toString)
+          (-> ecc-curves/k256.G (.mult2 3 5 ecc-curves/k256.G) .-x .toString))))
   (testing "Can multiply a point"
     (is (= "0x4a5169f673aa632f538aaa128b6348536db2b637fd89073d49b6a23879cdb3ad"
           (-> ecc-curves/k256.G (.mult 1000) .-x .toString))))
