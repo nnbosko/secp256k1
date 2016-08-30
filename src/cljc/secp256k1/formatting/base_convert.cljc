@@ -111,7 +111,9 @@
     :hex        #?(:clj  (DatatypeConverter/parseHexBinary data)
                    :cljs (do
                            (assert (hex? data) "Input must be in hexadecimal")
-                           (goog.crypt/hexToByteArray data)))
+                           (-> data
+                               add-leading-zero-if-necessary
+                               goog.crypt/hexToByteArray)))
     :base64 #?(:clj  (DatatypeConverter/parseBase64Binary data)
                :cljs (goog.crypt.base64/decodeStringToByteArray data))
     :base58 #?(:clj  (base58-to-byte-array data)
@@ -119,9 +121,9 @@
                          base58-to-hex
                          goog.crypt/hexToByteArray))
     :bytes #?(:clj  (byte-array data)
-              :cljs (do (assert (bytes? data)
-                                "Argument must be a byte array")
-                        (clj->js data)))
+              :cljs (do
+                      (assert (bytes? data) "Argument must be a byte array")
+                      (apply array data)))
     (throw (ex-info "Unsupported format"
                     {:data   data
                      :format format}))))
@@ -139,7 +141,7 @@
              (recur (cons s acc) (quot n 58)))
            (apply str (concat
                         (repeat leading-zeros
-                          (first base-fifty-eight-chars))
+                                (first base-fifty-eight-chars))
                         acc))))))
    :cljs
    (let [fifty-eight (Integer/fromInt 58)]
@@ -194,7 +196,6 @@
    (defn base58-to-hex
      "Encodes a base58-string as a hex-string"
      [data]
-     (assert (base58? data) "Input must be in base58")
      (-> data
        base58-to-byte-array
        (byte-array-to-base :hex))))
