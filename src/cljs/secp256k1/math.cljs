@@ -33,14 +33,14 @@
       ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_3_modulo_4
       (or (= mod8 3) (= mod8 7))
       (let [m (-> modulus (.add 1) .normalize .halveM .halveM)]
-        (.powermod n m modulus))
+        (.modPow n m modulus))
 
       ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_5_modulo_8
       (= mod8 5)
       (let [m (-> modulus (.sub 5) .normalize .halveM .halveM .halveM)
-            v (.powermod (.add n n) m modulus)
-            i (-> (.mul v v) (.mul n) (.mul 2) (.sub 1) (.mod modulus))]
-        (-> n (.mul v) (.mul i) (.mod modulus)))
+            v (.modPow (.add n n) m modulus)
+            i (-> (.multiply v v) (.multiply n) (.multiply 2) (.sub 1) (.mod modulus))]
+        (-> n (.multiply v) (.multiply i) (.mod modulus)))
 
       ;; http://www.mersennewiki.org/index.php/Modular_Square_Root#Modulus_congruent_to_1_modulo_8
       (= mod8 1)
@@ -52,36 +52,41 @@
             two (new bn 2)
             z   (->> (range) rest rest
                      (map #(new bn %))
-                     (map #(.powermod % q modulus))
+                     (map #(.modPow % q modulus))
                      (filter
                       #(not
                         (.equals
-                         (.powermod % (.power two (- e 1)) modulus)
+                         (.modPow % (.pow two (- e 1)) modulus)
                          1)))
                      first)
-            x   (.powermod n (-> q (.sub 1) .normalize .halveM) modulus)]
+            x   (.modPow n (-> q (.sub 1) .normalize .halveM) modulus)]
         (loop [y z,
                r e,
-               v (-> n (.mul x) (.mod modulus)),
-               w (-> n (.mul x) (.mul x) (.mod modulus))]
+               v (-> n (.multiply x) (.mod modulus)),
+               w (-> n (.multiply x) (.multiply x) (.mod modulus))]
           (if (.equals w 1)
             v
             (let [k (->> (range)
                          (map #(vector
                                 %
-                                (.powermod w (.power two %) modulus)))
+                                (.modPow w (.pow two %) modulus)))
                          (filter #(.equals (second %) 1))
                          first first)
-                  d (.powermod y (.power two (- r k 1)) modulus)
-                  y (.mod (.mul d d) modulus)
-                  v (.mod (.mul d v) modulus)
-                  w (.mod (.mul w y) modulus)]
+                  d (.modPow y (.pow two (- r k 1)) modulus)
+                  y (.mod (.multiply d d) modulus)
+                  v (.mod (.multiply d v) modulus)
+                  w (.mod (.multiply w y) modulus)]
               (recur y k v w)))))
 
       :else
       (throw (ex-info "Cannot compute a square root for a non-prime modulus"
                       {:argument n,
                        :modulus modulus})))))
+
+(defonce ^:private
+  ^{:doc "A random number generator to fall back on when crypto.getRandomvalues is not available"}
+  isaac-rng
+  (new Isaac))
 
 (defn- secure-random-bytes
   "Generate secure random bytes in a platform independent manner"
@@ -106,20 +111,23 @@
          toArray)
 
     :else
-    ;; Fallback to isaac.js
-    (let [rng (new Isaac)]
-      (->>
-       (repeatedly (/ byte-count 4) #(.rand rng))
-       (mapcat #(for [i (range 4)]
-                  (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))))
-       clj->js))))
+    ;; Fallback to Isaac.js
+    (->>
+     (repeatedly (-> byte-count (/ 4) js/Math.ceil) #(.rand isaac-rng))
+     ;; Isaac outputs an array of words which need to be converted into bytes
+     (mapcat #(for [i (range 4)]
+                (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))))
+      (take byte-count)
+     (apply array))))
 
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"
   [arg]
   (let [n          (new bn arg)
-        byte-count (-> n .bitLength (/ 8))
+        byte-count (-> n .bitLength (/ 8) js/Math.ceil)
         bytes      (secure-random-bytes byte-count)]
+    (assert (= (count bytes) byte-count)
+      "Did not retrieve proper correct number of bytes from random byte generator")
     (-> bytes
         (->> (map #(add-leading-zero-if-necessary
                     (.toString % 16)))

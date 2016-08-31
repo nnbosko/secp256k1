@@ -46,9 +46,9 @@ goog.require('secp256k1.sjcl.bitArray');
 /**
  * Constructs a new BigNum from another BigNum, a number or a hex string.
  * @constructor
- * @final
- * @param {string|number|secp256k1.sjcl.bn} it Object to initialize into a BigNum
  * @struct
+ * @final
+ * @param {string|number|secp256k1.sjcl.bn} it Object to initialize into a big-num
  */
 secp256k1.sjcl.bn = function (it) {
     var i = 0, k;
@@ -114,7 +114,7 @@ secp256k1.sjcl.bn.ipv = 1 / secp256k1.sjcl.bn.placeVal;
  * @param {string|number|secp256k1.sjcl.bn} n Exponent to raise to
  * @returns {secp256k1.sjcl.bn}
  */
-secp256k1.sjcl.bn.prototype.power = function (n) {
+secp256k1.sjcl.bn.prototype.pow = function (n) {
     var l = new secp256k1.sjcl.bn(n).normalize().trim().limbs;
     var i, j, out = new secp256k1.sjcl.bn(1), pow = this;
 
@@ -122,7 +122,7 @@ secp256k1.sjcl.bn.prototype.power = function (n) {
         for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
             //noinspection JSBitwiseOperatorUsage
             if (l[i] & (1 << j)) {
-                out = out.mul(pow);
+                out = out.multiply(pow);
             }
             if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
                 break;
@@ -142,17 +142,17 @@ secp256k1.sjcl.bn.prototype.power = function (n) {
  * @param {string|number|secp256k1.sjcl.bn} N Modulus
  * @returns {secp256k1.sjcl.bn}
  */
-secp256k1.sjcl.bn.prototype.powermod= function (x, N) {
+secp256k1.sjcl.bn.prototype.modPow= function (x, N) {
     x = new secp256k1.sjcl.bn(x);
     N = new secp256k1.sjcl.bn(N);
 
-    // Jump to montpowermod if possible.
+    // Jump to montgomeryModPow if possible.
     if ((N.limbs[0] & 1) == 1) {
-        var montOut = this.montpowermod(x, N);
+        var montOut = this.montgomeryModPow(x, N);
 
         if (montOut != false) {
             return montOut;
-        } // else go to slow powermod
+        } // else go to slow modPow
     }
 
     var i, j, l = x.normalize().trim().limbs, out = new secp256k1.sjcl.bn(1), pow = this;
@@ -161,13 +161,13 @@ secp256k1.sjcl.bn.prototype.powermod= function (x, N) {
         for (j = 0; j < secp256k1.sjcl.bn.radix; j++) {
             //noinspection JSBitwiseOperatorUsage
             if (l[i] & (1 << j)) {
-                out = out.mulmod(pow, N);
+                out = out.multiply(pow).mod(N);
             }
             if (i == (l.length - 1) && l[i] >> (j + 1) == 0) {
                 break;
             }
 
-            pow = pow.mulmod(pow, N);
+            pow = pow.multiply(pow).mod(N);
         }
     }
 
@@ -180,7 +180,7 @@ secp256k1.sjcl.bn.prototype.powermod= function (x, N) {
  * @param {string|number|secp256k1.sjcl.bn} N Modulus
  * @returns {secp256k1.sjcl.bn}
  */
-secp256k1.sjcl.bn.prototype.montpowermod = function (x, N) {
+secp256k1.sjcl.bn.prototype.montgomeryModPow = function (x, N) {
     x = new secp256k1.sjcl.bn(x).normalize().trim();
     N = new secp256k1.sjcl.bn(N);
 
@@ -241,10 +241,10 @@ secp256k1.sjcl.bn.prototype.montpowermod = function (x, N) {
     NP = NP.normalize();
 
     RR.doubleM();
-    var R2 = RR.mulmod(RR, N);
+    var R2 = RR.square().mod(N);
 
 
-    if (!RR.mul(RP).sub(N.mul(NP)).equals(1)) {
+    if (!RR.multiply(RP).sub(N.multiply(NP)).equals(1)) {
         throw new Error("Cannot perform Montgomery reduction on this modulus.");
     }
 
@@ -254,16 +254,16 @@ secp256k1.sjcl.bn.prototype.montpowermod = function (x, N) {
         montMul = function (a, b) {
             // Standard Montgomery reduction
             var k, ab, right, abBar, mask = (1 << (s + 1)) - 1;
-            ab = a.mul(b);
+            ab = a.multiply(b);
 
-            right = ab.mul(NP);
+            right = ab.multiply(NP);
             right.limbs = right.limbs.slice(0, R.limbs.length);
 
             if (right.limbs.length == R.limbs.length) {
                 right.limbs[R.limbs.length - 1] &= mask;
             }
 
-            right = right.mul(N);
+            right = right.multiply(N);
 
             abBar = ab.add(right).normalize().trim();
             abBar.limbs = abBar.limbs.slice(R.limbs.length - 1);
@@ -393,22 +393,6 @@ secp256k1.sjcl.bn.prototype.trim = function () {
 };
 
 /**
- * this * that mod N
- * @param {string|number|secp256k1.sjcl.bn} that Value to multiply by
- * @param {string|number|secp256k1.sjcl.bn} N Modulus
- * @returns {!secp256k1.sjcl.bn}
- */
-secp256k1.sjcl.bn.prototype.mulmod = function (that, N) {
-    if (!(that instanceof secp256k1.sjcl.bn)) {
-        that = new secp256k1.sjcl.bn(that);
-    }
-    if (!(N instanceof secp256k1.sjcl.bn)) {
-        N = new secp256k1.sjcl.bn(N);
-    }
-    return this.mod(N).mul(that.mod(N)).mod(N);
-};
-
-/**
  * Return the length in bits, rounded up to the nearest byte.
  * @returns {!number}
  */
@@ -424,10 +408,10 @@ secp256k1.sjcl.bn.prototype.bitLength = function () {
 
 /**
  * Return inverse mod prime p.  p must be odd. Uses the binary extended Euclidean algorithm.
- * @param {string|number|secp256k1.sjcl.bn} p A prime to take the multiplicative inverse modulo
- * @returns {secp256k1.sjcl.bn} The multiplicative inverse of this bignum modulo the specified prime.
+ * @param {string|number|secp256k1.sjcl.bn} p A prime to take the modular multiplicative inverse by.
+ * @returns {secp256k1.sjcl.bn} The multiplicative inverse of this big-num modulo the specified prime.
  */
-secp256k1.sjcl.bn.prototype.inverseMod = function (p) {
+secp256k1.sjcl.bn.prototype.modInverse = function (p) {
     var a = secp256k1.sjcl.bn.ONE.copy(),
         b = secp256k1.sjcl.bn.ZERO.copy(),
         x = this.copy(),
@@ -436,7 +420,7 @@ secp256k1.sjcl.bn.prototype.inverseMod = function (p) {
 
     //noinspection JSBitwiseOperatorUsage
     if (!(y.limbs[0] & 1)) {
-        throw new Error("inverseMod: modulus must be odd");
+        throw new Error("modInverse: modulus must be odd");
     }
 
     // Invariant: y is odd
@@ -478,7 +462,7 @@ secp256k1.sjcl.bn.prototype.inverseMod = function (p) {
     } while (nz);
 
     if (!y.equals(1)) {
-        throw (new Error("inverseMod: modulus and argument must be relatively prime"));
+        throw (new Error("modInverse: modulus and argument must be relatively prime"));
     }
 
     return b;
@@ -503,11 +487,11 @@ secp256k1.sjcl.bn.prototype.sub = function (that) {
 };
 
 /**
- * This * Than, normalizes
+ * this * that. Normalizes.
  * @param {string|number|secp256k1.sjcl.bn} that
  * @returns {!secp256k1.sjcl.bn}
  */
-secp256k1.sjcl.bn.prototype.mul = function (that) {
+secp256k1.sjcl.bn.prototype.multiply = function (that) {
     if (!(that instanceof secp256k1.sjcl.bn)) {
         that = new secp256k1.sjcl.bn(that);
     }
@@ -539,7 +523,7 @@ secp256k1.sjcl.bn.prototype.mul = function (that) {
 
 /** this ^ 2.  Normalizes and reduces. */
 secp256k1.sjcl.bn.prototype.square = function () {
-    return this.mul(this);
+    return this.multiply(this);
 };
 
 /**
@@ -683,7 +667,7 @@ secp256k1.sjcl.bn.prototype.equals = function (that, normalize) {
 
 /**
  * Get the ith limb of this, zero if i is too large.
- * @param {!number} i Index of the limb to get
+ * @param {number} i Index of the limb to get
  * @returns {!number} The value of the limb or zero if it does not exist.
  */
 secp256k1.sjcl.bn.prototype.getLimb = function (i) {

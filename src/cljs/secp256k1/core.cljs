@@ -17,15 +17,18 @@
             base-to-base
             byte-array-to-base
             bytes?]]
-   [secp256k1.sjcl.bn]
    [secp256k1.sjcl.ecc.curves :as ecc-curves]
    [secp256k1.sjcl.ecc.ECPoint :as ecc-ecpoint]
    [secp256k1.hashes :refer [sha256 ripemd-160 hmac-sha256]]
-   [secp256k1.sjcl.bitArray :as bitArray]
    [secp256k1.sjcl.codec.bytes :as bytes]
    [secp256k1.sjcl.codec.hex :as hex])
   (:import [secp256k1.sjcl bn]
            [secp256k1.sjcl.ecc ECPoint]))
+
+(defonce
+  ^:private
+  ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
+  curve ecc-curves/k256)
 
 (extend-protocol IEquiv
   bn
@@ -50,18 +53,11 @@
             (= ax bx)
             (= ay by)))))))
 
-(defonce
-  ^:private
-  ^{:doc "The secp256k1 curve object provided by SJCL that is used often"}
-  curve ecc-curves/k256)
-
 (defprotocol PrivateKey
   (private-key [this] [this base]))
 
 (extend-protocol PrivateKey
-
-  ;; Unboxed
-  bn
+  bn ; Unboxed
   (private-key
     ([priv-key _] (private-key priv-key))
     ([priv-key]
@@ -89,6 +85,9 @@
     ([this]
      (private-key this :hex))))
 
+(defprotocol PublicKey
+  (public-key [this] [this base]))
+
 (defn- valid-point?
   "Predicate to determine if something is a valid ECC point on our curve"
   [point]
@@ -97,31 +96,26 @@
     (= (.-curve point) curve)
     (.isValid point)))
 
-(defprotocol PublicKey
-  (public-key [this] [this base]))
-
 (defn- compute-point
   "Compute an elliptic curve point for a y-coordinate parity and x-coordinate"
-  [y-even? x]
+  [y-even x]
   (let [modulus     (-> curve .-field .-modulus)
         ;; √(x * (a + x**2) + b) % p
         y-candidate (modular-square-root
                      (.add
-                      (.mul x (.add (.-a curve) (.square x)))
+                      (.multiply x (.add (.-a curve) (.square x)))
                       (.-b curve))
                      modulus)
-        y           (if (= y-even? (even? y-candidate))
+        y           (if (= y-even (even? y-candidate))
                       y-candidate
                       (.sub modulus y-candidate))]
     (public-key (new ECPoint curve x y))))
 
 (defn- x962-hex-compressed-decode
   [encoded-key]
-  (let [x           (-> encoded-key
-                        (subs 2)
-                        bn.)
-        y-even?     (= (subs encoded-key 0 2) "02")]
-    (compute-point y-even? x)))
+  (let [x      (-> encoded-key (subs 2) bn.)
+        y-even (= (subs encoded-key 0 2) "02")]
+    (compute-point y-even x)))
 
 (defn- x962-hex-uncompressed-decode
   [encoded-key]
@@ -130,15 +124,12 @@
         y (subs encoded-key (+ 2 l))]
     (public-key (new ECPoint curve x y))))
 
-;; TODO: Mirror in Clojure
 (defn x962-decode
-  "Decode a x962-encoded public key from a hexadecimal string.
-
-  Reference implementation: https://github.com/indutny/elliptic/blob/master/lib/elliptic/curve/short.js#L188"
+  "Decode a X9.62 encoded public key"
   [input & {:keys [input-format]
             :or   {input-format :hex}}]
   (let [encoded-key (base-to-base input input-format :hex)
-        l (-> curve .-r .bitLength (/ 4))]
+        l           (-> curve .-r .bitLength (/ 4))]
     (cond
       (and (#{"02" "03"} (subs encoded-key 0 2))
            (= (+ 2 l) (count encoded-key)))
@@ -181,9 +172,9 @@
   bn
   (public-key
     ([priv-key _]
-     (.mult (.-G curve) (private-key priv-key)))
+     (.multiply (.-G curve) (private-key priv-key)))
     ([priv-key]
-     (.mult (.-G curve) (private-key priv-key)))))
+     (.multiply (.-G curve) (private-key priv-key)))))
 
 (defn x962-encode
   "Encode a sjcl.ecc.point as hex using X9.62 compression"
@@ -220,15 +211,13 @@
                           (take 4))]
     (byte-array-to-base (concat pub-prefixed checksum) output-format)))
 
-;; TODO: Support alternative output formats
-(defn generate-sin
-  "Generate a new private key, new public key, SIN and timestamp"
+(defn generate-address-pair
+  "Generate a new private key and new public key, along with a timestamp"
   []
   (let [priv-key (private-key (secure-random (.-r curve)))]
-    {:created (js/Date.now),
-     :priv    priv-key,
-     :pub     (public-key priv-key),
-     :sin     (get-sin-from-public-key priv-key)}))
+    {:created (new js/Date),
+     :private-key  priv-key,
+     :public-key (public-key priv-key)}))
 
 
 ;; TODO: Implement BouncyCastle's Deterministic K generator
@@ -249,6 +238,8 @@
         v            (hmac-sha256 k v)
         k            (hmac-sha256 k (concat v [1] pk hash))
         v            (hmac-sha256 k v)]
+    (assert (= (count hash) curve-bytes)
+            "Hash should have the same number of bytes as the curve modulus")
     (byte-array-to-base (hmac-sha256 k v) :biginteger)))
 
 (defn- compute-recovery-byte
@@ -263,7 +254,6 @@
         (+ (if big-r? 2 0))
         (.toString 16))))
 
-;; TODO: Test me
 ;; TODO: Add cannonical flag
 (defn sign-hash
   "Sign some a hash of some data with a private-key"
@@ -275,19 +265,19 @@
                            private-key-format :hex
                            output-format :hex
                            recovery-byte true}}]
-  (let [d    (private-key priv-key private-key-format)
-        n    (.-r curve)
-        l    (.bitLength n)
-        z    (base-to-base hash input-format :biginteger)
-        k    (deterministic-generate-k d hash)
-        kp   (-> curve .-G (.mult k))
-        r    (-> kp .-x (.mod n))
-        s_   (-> (.mul r d) (.add z) (.mul (.inverseMod k n)) (.mod n))
-        s    (if (.greaterEquals (.add s_ s_) n)
-               (.sub n s_)
-               s_)]
-    (assert (= (count (base-to-byte-array hash input-format))
-               (-> curve .-r .bitLength (/ 8)))
+  (let [d     (private-key priv-key private-key-format)
+        n     (.-r curve)
+        l     (.bitLength n)
+        input (base-to-byte-array hash input-format)
+        z     (byte-array-to-base input :biginteger)
+        k     (deterministic-generate-k d input)
+        kp    (-> curve .-G (.multiply k))
+        r     (-> kp .-x (.mod n))
+        s_    (-> (.multiply r d) (.add z) (.multiply (.modInverse k n)) (.mod n))
+        s     (if (.greaterEquals (.add s_ s_) n)
+                (.sub n s_)
+                s_)]
+    (assert (= (count input) (-> curve .-r .bitLength (/ 8)))
             "Hash should have the same number of bytes as the curve modulus")
     (DER-encode-ECDSA-signature
      {:R (-> r (.toBits l) hex/fromBits)
@@ -295,7 +285,6 @@
       :recover (when recovery-byte (compute-recovery-byte kp r s_))}
      :output-format output-format)))
 
-;; TODO: Test alternate output formats
 ;; TODO: Add cannonical flag
 (defn sign
   "Sign some data with a private-key"
@@ -327,18 +316,18 @@
           (goog.string/format
            "Recovery byte should be between 0x1B and 0x1E (was %s)"
            (str recovery-byte)))
-  (let [y-even? (even? (- recovery-byte 0x1B))
+  (let [y-even (even? (- recovery-byte 0x1B))
         is-second-key? (odd? (-> recovery-byte
                                  .toString
                                  js/parseInt
                                  (- 0x1B)
                                  (bit-shift-right 1)))
         n (.-r curve)
-        R (compute-point y-even? (if is-second-key? (.add r n) r))
-        e-inv (.sub n (byte-array-to-base hash :biginteger))
-        r-inv (.inverseMod r n)]
-    (-> curve .-G (.mult2 e-inv s R)
-        (.mult r-inv)
+        R (compute-point y-even (if is-second-key? (.add r n) r))
+        r-inv (.modInverse r n)
+        e-inv (.sub n (byte-array-to-base hash :biginteger))]
+    (-> (ecc-ecpoint/sumOfTwoMultiplies e-inv (.-G curve) s R)
+        (.multiply r-inv)
         public-key)))
 
 (defn recover-public-key-from-hash
@@ -376,14 +365,13 @@
                       :output-format :biginteger)
         n            (.-r curve)
         r            (.mod r n)
-        s-inv        (.inverseMod s n)
+        s-inv        (.modInverse s n)
         z            (.mod (byte-array-to-base hash :biginteger) n)
         u1           (-> z
-                         (.mul s-inv)
+                         (.multiply s-inv)
                          (.mod n))
-        u2           (-> r (.mul s-inv) (.mod n))
-        r2           (-> curve .-G
-                         (.mult2 u1 u2 pub-key)
+        u2           (-> r (.multiply s-inv) (.mod n))
+        r2           (-> (ecc-ecpoint/sumOfTwoMultiplies u1 (.-G curve) u2 pub-key)
                          .-x (.mod n))]
     (= r r2)))
 
@@ -428,7 +416,6 @@
   "Verify that a SIN is valid"
   [sin & {:keys [input-format]
           :or   {input-format :base58}}]
-  (try
     (let [pub-with-checksum (base-to-byte-array sin input-format)
           len               (count pub-with-checksum)
           expected-checksum (->> pub-with-checksum (drop 22) vec)
@@ -444,5 +431,4 @@
       (and
        (= len 26)
        (= prefix [0x0f 0x02])
-       (= expected-checksum actual-checksum)))
-    (catch js/Error _ false)))
+       (= expected-checksum actual-checksum))))

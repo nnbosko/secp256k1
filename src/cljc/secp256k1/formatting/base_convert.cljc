@@ -58,13 +58,13 @@
                         (take-while
                          #(= % (first base-fifty-eight-chars)))
                         (map (constantly 0)))]
-       (loop [result 0, s s]
+       (loop [result 0N, s s]
          (if-not (empty? s)
            (recur (+ (*' result 58)
                      (.indexOf base-fifty-eight-chars (str (first s))))
                   (rest s))
            (->> result
-                .toBigInteger
+                biginteger
                 .toByteArray
                 (drop-while zero?)
                 (concat padding)
@@ -80,7 +80,7 @@
        (loop [result sjcl-bn/ZERO,
               s s]
          (if-not (empty? s)
-           (recur (.add (.mul result 58)
+           (recur (.add (.multiply result 58)
                         (.indexOf base-fifty-eight-chars (first s)))
                   (rest s))
            (-> result
@@ -110,7 +110,9 @@
                    :cljs (->> data (new bn) .toBits bytes/fromBits))
     :hex        #?(:clj  (DatatypeConverter/parseHexBinary data)
                    :cljs (do
-                           (assert (hex? data) "Input must be in hexadecimal")
+                           (assert (hex? data)
+                                   (str "Input must be in hexadecimal (was "
+                                        data ")"))
                            (-> data
                                add-leading-zero-if-necessary
                                goog.crypt/hexToByteArray)))

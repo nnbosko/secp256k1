@@ -281,26 +281,28 @@
                   "04bf0e38b86329f84ea90972e0f901d5ea0145f1ebac8c50fded77796d7a70e1be9e001b7ece071fb3986b5e96699fe28dbdeec8956682da78a5f6a115b9f14c"))))
 
   (testing "x962-encode can handle both compressed and uncompressed keys"
-    (letfn [(encode-decode [x]
-              (-> x
-                  secp256k1/public-key
-                  (secp256k1/x962-encode :compressed false)
-                  (secp256k1/x962-encode :compressed false)
-                  secp256k1/public-key
-                  secp256k1/public-key
-                  secp256k1/x962-encode
-                  (secp256k1/x962-encode :compressed false)
-                  secp256k1/x962-encode
-                  (secp256k1/x962-encode :compressed false)))]
-      (are [y] (= y (encode-decode y))
-        "04256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1ca81c29a7307b6c77182b77ce9699b6b2940610b2306825fd38a475dd3c804c4"
-        "0433952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58a002d2f3b46b55c54d1780c176119497cb81b0ace382227f2a6b8b3ba1eccd83"
-        "04816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846eea75ae3bd6a053582d362a054129567ff2e0c4877e7b2a4d958913121b099f7"
-        "0433bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd11880422a1640df75f9601927e09b6c053e0aef740f52fc4b341e750891294210"
-        "04e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e02cd25f31fd29119c7259840b97855156f3a9ac52f7ae0cb69c22695e649d2fc"
-        "04fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c07532c7c1481771989377bb0a7820c554c272fd77cdf2dac55f3aa1eca82eaf5"
-        "043502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9dd3c65e83963adac704e5782b5f886280a8c4960f1e49152b139bfd05862c7af"
-        "0487efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5aa43aaed73348f97b306145ce0544078210f7e587c675805ccc0933d6673c979")))
+    (are [y] (= y (-> y
+                      secp256k1/public-key
+                      (secp256k1/x962-encode :compressed false)
+                      (secp256k1/x962-encode :compressed false)
+                      secp256k1/public-key
+                      secp256k1/public-key
+                      secp256k1/x962-encode
+                      secp256k1/x962-decode
+                      (secp256k1/x962-encode :output-format :base58)
+                      (secp256k1/x962-decode :input-format :base58)
+                      secp256k1/x962-encode
+                      (secp256k1/x962-encode :compressed false)
+                      secp256k1/x962-encode
+                      (secp256k1/x962-encode :compressed false)))
+      "04256b4b6062521370d21447914fae65deacd6a5d86347e6e69e66daab8616fae1ca81c29a7307b6c77182b77ce9699b6b2940610b2306825fd38a475dd3c804c4"
+      "0433952d51e42f7db05a6c9dd347c4a7b4d4167ba29191ce1b86a0c0dd39bffb58a002d2f3b46b55c54d1780c176119497cb81b0ace382227f2a6b8b3ba1eccd83"
+      "04816a53aded6d63ae34c2e87addba7532c096c4e2bcfc95f1ecfc7d78e0bad846eea75ae3bd6a053582d362a054129567ff2e0c4877e7b2a4d958913121b099f7"
+      "0433bdfb75729492c8203320ef900c6f38f98e3c92cc93ac13c5fdf268828b8cd11880422a1640df75f9601927e09b6c053e0aef740f52fc4b341e750891294210"
+      "04e64efe4258a418e33087f818ea5f8ac9ce7b00b4ba1ce469423dd0abbc7d478e02cd25f31fd29119c7259840b97855156f3a9ac52f7ae0cb69c22695e649d2fc"
+      "04fe4e1d6fd5e3098e8fa9e2bedb3340aac95d14549231d0a8c7c72853db5d574c07532c7c1481771989377bb0a7820c554c272fd77cdf2dac55f3aa1eca82eaf5"
+      "043502a164ed317f5d2278e79a75db9b3ef98616efec53925b22c75999fdcb8ab9dd3c65e83963adac704e5782b5f886280a8c4960f1e49152b139bfd05862c7af"
+      "0487efe8c69a2cfbba735afd486b07bd85b7749dd19c5772da30564652ec7e84c5aa43aaed73348f97b306145ce0544078210f7e587c675805ccc0933d6673c979"))
 
   (testing "More checks that x962-point-encoding is idempotent"
     (letfn [(encode-decode [x]
@@ -438,8 +440,7 @@
         "304402206བང་འབངས་མི་ཞིག་ལ་མba84011c961db733e28f40f2496e8ff1ba60fcbf942b609fd1a9a6971f22e5b02202987d7d6ad5c330c7fdacefe3351554c00f42b82b7ad513104de8caebae40fc8",
 
         "རོ་མའི་རང་དབང་འབངས་མི་ཞིག་ལ་མིང་གསུམ་ཡོད་དེ།"
-        "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c",
-        ))))
+        "304402200e4b0560c42e4d1e19ddc2541f5531f7614628e9d01503d730ebe38c182baee8702206b80868e3d67fec2a9d5a594edd6b4f0266044965fe41e7cc3bff65feb922b7c"))))
 
 (deftest deterministic-signatures
   (testing "Can verify a deterministic signature"
@@ -478,7 +479,22 @@
          (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
                 (secp256k1/sign
                  (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "trololololol")))))
+                 "trololololol")))
+         (is (= "GzBEAiBFm3gXzy+RYsNbXFrfbbDWxgX+QXcF5XcjcbnLbXr1fgIgRHlbQLkWcnoCARPPyzMSCI2fzWF8/q0Mt/9zB9Vsg88="
+                (secp256k1/sign
+                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+                 "trololololol"
+                 :output-format :base64)))
+         (is (= "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7"
+                (secp256k1/sign-hash
+                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+                 "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
+                 :output-format :hex)))
+         (is (= "HDBEAiAtuEl/RKoRm3pb27TqdcDzwDZeoHwWaLhhgqrET1dnwQIgQe6Z0IE4smzmmvei3p6/8JzuVyS3ZVdgMepDIrck8uc="
+                (secp256k1/sign-hash
+                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+                 "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
+                 :output-format :base64)))))
 
 (deftest recovery-byte-tests
   (testing "Can recover a public key from a signature with a recovery byte"
@@ -487,12 +503,24 @@
                secp256k1/private-key
                (secp256k1/sign "foo" :recovery-byte true)
                (->> (secp256k1/recover-public-key "foo")))))
+    (is (= (secp256k1/public-key (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
+           (secp256k1/recover-public-key
+            "trololololol"
+            "GzBEAiBFm3gXzy+RYsNbXFrfbbDWxgX+QXcF5XcjcbnLbXr1fgIgRHlbQLkWcnoCARPPyzMSCI2fzWF8/q0Mt/9zB9Vsg88="
+            :input-format :base64)))
     (is (= (secp256k1/public-key
             (secp256k1/private-key
              "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
            (secp256k1/recover-public-key
             "trololololol"
-            "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf")))))
+            "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf")))
+    (is (= (secp256k1/public-key
+            (secp256k1/private-key
+             "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
+           (secp256k1/recover-public-key-from-hash
+            "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
+            "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7")))
+    ))
 
 ;; TODO: test different input formats
 (deftest sin-tests
@@ -506,30 +534,36 @@
       "TfBZ3DacgxVbemggEXZtHxoNXgD5FWi2cLD"
       "TfFc5Rh5NFFY6EsGcY6xe6vSct2hCWzk25X"))
 
-  (testing "Ill-formatted sins are invalid"
+  (testing "Sad Path: Invalid Sins"
     (are [x] (= (secp256k1/validate-sin x) false)
+      ""
+      "TfGVzWqwft6fFdLzyvR7qFTT77N7aTqa4n"
+      "Tf4Lo9zAezP7LKc3njaK5pez7oVhzH2H"
+      "1111TfFc5NFFY6EsGcY6xe6vSct2hCWzk25X"))
+  (testing "Sad Path: Checking sins throws"
+    (are [x] (thrown? #?(:clj Throwable :cljs js/Error)
+                      (secp256k1/validate-sin x))
       7
       (constantly :foo)
       :bar
-      ""
       "\"\""
       "/TfKAQBFY3FPixJGVp81TWbjMdv2ftnZ8CRL"
-      "TfGVzWqwft6fFdLzyvR7qFTT77N7aTqa4n"
-      "Tf4Lo9zAezP7LKc3njaK5pez7oVhzH2H"
       "%Tf7EsXB155iZ1aMkxh5ZyUJ7rTAyaZ6CFeT"
       "&TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
-      "TfBZ3DacgxVbem&&ggEXZtHxoNXgD5FWi2cLD"
-      "1111TfFc5NFFY6EsGcY6xe6vSct2hCWzk25X")))
+      "TfBZ3DacgxVbem&&ggEXZtHxoNXgD5FWi2cLD")))
 
 ;; TODO: test different output formats
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
-    (let [{:keys [:priv :pub :sin]} (secp256k1/generate-sin)]
+    (let [{priv      :private-key
+           pub       :public-key
+           timestamp :created} (secp256k1/generate-address-pair)
+          sin (secp256k1/get-sin-from-public-key pub)]
+      (is (inst? timestamp))
       (is (= pub (secp256k1/public-key priv)))
       (is (= (secp256k1/x962-encode pub)
              (secp256k1/x962-encode priv)))
-      (is (= sin (-> priv
-                     secp256k1/get-sin-from-public-key)))
+      (is (= sin (secp256k1/get-sin-from-public-key priv)))
       (is (secp256k1/validate-sin sin))
       (is (instance? ECPoint pub))
       (is (instance? #?(:cljs bn

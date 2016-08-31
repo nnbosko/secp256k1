@@ -106,7 +106,12 @@
                 (.multiply (private-key this))
                 .normalize))))
 
-;; TODO: introduce x962-decode for convenience
+(defn x962-decode
+  "Decode a X9.62 encoded public key"
+  [input & {:keys [input-format]
+            :or   {input-format :hex}}]
+  (public-key input input-format))
+
 (defn x962-encode
   "Encode a public key using X9.62 compression"
   [pub-key & {:keys [compressed output-format input-format]
@@ -139,8 +144,8 @@
                           (take 4))]
     (byte-array-to-base (concat pub-prefixed checksum) output-format)))
 
-(defn generate-sin
-  "Generate a new private key, new public key, SIN and timestamp"
+(defn generate-address-pair
+  "Generate a new private key and new public key, along with a timestamp"
   []
   (let [priv-key
         (-> (ECKeyPairGenerator.)
@@ -152,10 +157,9 @@
             .getPrivate .getD
             private-key)
         pub-key (public-key priv-key)]
-    {:created (System/currentTimeMillis),
-     :priv priv-key,
-     :pub pub-key,
-     :sin (get-sin-from-public-key pub-key)}))
+    {:created (new java.util.Date),
+     :private-key priv-key,
+     :public-key pub-key}))
 
 (defonce ^:private digest-params (into-array []))
 
@@ -364,7 +368,6 @@
   "Verify that a SIN is valid"
   [sin & {:keys [input-format]
           :or   {input-format :base58}}]
-  (try
     (let [pub-with-checksum (base-to-byte-array sin input-format)
           len               (count pub-with-checksum)
           expected-checksum (->> pub-with-checksum (drop 22) vec)
@@ -380,5 +383,4 @@
       (and
        (= len 26)
        (= prefix [0x0f 0x02])
-       (= expected-checksum actual-checksum)))
-    (catch Throwable _ false)))
+       (= expected-checksum actual-checksum))))
