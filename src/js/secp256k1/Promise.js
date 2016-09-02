@@ -94,15 +94,15 @@ secp256k1.Promise = function (fn) {
 
 
 /**
+ * @param {secp256k1.Promise} promise
  * @param {Function=} onFulfilled
  * @param {Function=} onRejected
- * @param {secp256k1.Promise} promise
  * @private
  * @constructor
  * @struct
  * @final
  */
-function Handler(onFulfilled, onRejected, promise) {
+function Handler(promise, onFulfilled, onRejected) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.promise = promise;
@@ -230,13 +230,13 @@ function doResolve(fn, self) {
 
 /**
  * @param {Function} onFulfilled
- * @param {Function} onRejected
+ * @param {Function=} onRejected
  * @returns {secp256k1.Promise}
  */
 secp256k1.Promise.prototype.then = function (onFulfilled, onRejected) {
     var prom = new (secp256k1.Promise)(noop);
 
-    handle(this, new Handler(onFulfilled, onRejected, prom));
+    handle(this, new Handler(prom, onFulfilled, onRejected));
     return prom;
 };
 
