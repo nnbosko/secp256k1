@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [even?])
   (:require [secp256k1.formatting.base-convert
              :refer [add-leading-zero-if-necessary]]
-            [goog.array :refer [toArray]])
+            [goog.array :refer [toArray]]
+            [secp256k1.sjcl.codec.bytes :as bytes])
   (:import [secp256k1.math.random Isaac]
            [secp256k1.sjcl bn]))
 
@@ -83,7 +84,7 @@
                       {:argument n,
                        :modulus modulus})))))
 
-(defonce ^:private
+(defonce
   ^{:doc "A random number generator to fall back on when crypto.getRandomvalues is not available"}
   isaac-rng
   (new Isaac))
@@ -114,10 +115,8 @@
     ;; Fallback to Isaac.js
     (->>
      (repeatedly (-> byte-count (/ 4) js/Math.ceil) #(.rand isaac-rng))
-     ;; Isaac outputs an array of words which need to be converted into bytes
-     (mapcat #(for [i (range 4)]
-                (bit-and 0xFF (unsigned-bit-shift-right % (* i 8)))))
-      (take byte-count)
+     bytes/fromBits
+     (take byte-count)
      (apply array))))
 
 (defn secure-random
