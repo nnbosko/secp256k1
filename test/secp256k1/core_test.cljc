@@ -558,7 +558,7 @@
     (let [{priv      :private-key
            pub       :public-key
            timestamp :created} (secp256k1/generate-address-pair)
-          sin (secp256k1/get-sin-from-public-key pub)]
+           sin (secp256k1/get-sin-from-public-key pub)]
       (is (inst? timestamp))
       (is (= pub (secp256k1/public-key priv)))
       (is (= (secp256k1/x962-encode pub)

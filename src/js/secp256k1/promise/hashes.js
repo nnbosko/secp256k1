@@ -1,5 +1,5 @@
 /**
- * @fileoverview Asynchronous hashes via `crypto.subtle`
+ * @fileoverview Asynchronous hashes via `crypto.subtle` (when available).
  *
  * This file provides an API for accessing built-in hashing functions via `crypto.subtle`
  *
@@ -10,13 +10,14 @@
  */
 
 goog.provide('secp256k1.promise.hashes');
-goog.require('secp256k1.Promise');
 goog.require('goog.array');
+goog.require('goog.asserts');
 goog.require('goog.crypt');
-goog.require('secp256k1.hashes');
+goog.require('goog.crypt.Sha256');
+goog.require('secp256k1.Promise');
+goog.require('secp256k1.sjcl.codec.bytes');
 
-//noinspection JSUnresolvedVariable
-var Promise = typeof window === "object" && typeof window.Promise === "function" ? window.Promise : secp256k1.Promise,
+var Promise = secp256k1.Promise,
     crypto = typeof window === "object" ?
         (typeof window.crypto !== "undefined" ? window.crypto :
             (typeof window.msCrypto !== "undefined" ? window.msCrypto : undefined)) : undefined,
@@ -26,22 +27,34 @@ var Promise = typeof window === "object" && typeof window.Promise === "function"
 
 /**
  * Take the SHA256 hash of an array of bytes.
- * @param {Array<number>|Uint8Array|string} data An array of bytes to be hashed
+ * @param {Array<number>|Uint8Array|string} data An array of bytes (or a UTF-8 string) to be hashed
  * @returns {Promise<Array<number>>} A promise containing the hashed result as an array of bytes.
  */
 secp256k1.promise.hashes.sha256 = function (data) {
-    if (typeof subtleCrypto !== "undefined") {
+    try {
         data = typeof data === "string" ? goog.crypt.stringToUtf8ByteArray(data) : data;
-        var buffer = new ArrayBuffer(data.length);
-        (new Uint8Array(buffer)).set(new Uint8Array(data));
-        return subtleCrypto.digest("SHA-256", buffer).then(
-            function (outputBuffer) {
-                //noinspection JSCheckFunctionSignatures
-                return goog.array.toArray(new Uint8Array(outputBuffer));
+        goog.asserts.assert(
+            secp256k1.sjcl.codec.bytes.isByteArrayLike(data), "Data must be a string or array of bytes");
+        if (typeof subtleCrypto !== "undefined") {
+            var buffer = new ArrayBuffer(data.length);
+            (new Uint8Array(buffer)).set(new Uint8Array(data));
+            return subtleCrypto.digest("SHA-256", buffer).then(
+                function (outputBuffer) {
+                    //noinspection JSCheckFunctionSignatures
+                    return goog.array.toArray(new Uint8Array(outputBuffer));
+                });
+        } else {
+            return new Promise(function (resolve, reject) {
+                try {
+                    var h = new goog.crypt.Sha256();
+                    h.update(data);
+                    return resolve(h.digest());
+                } catch (e) {
+                    return reject(e);
+                }
             });
-    } else {
-        return new Promise(function (resolve) {
-            return resolve(secp256k1.hashes.sha256(data));
-        });
+        }
+    } catch (e) {
+        return Promise.reject(e);
     }
 };
