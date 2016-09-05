@@ -115,19 +115,20 @@
     ;; Fallback to Isaac.js
     (->>
      (repeatedly (-> byte-count (/ 4) js/Math.ceil) #(.rand isaac-rng))
-     bytes/fromBits
+      (apply array)
+      bytes/fromBits
      (take byte-count)
      (apply array))))
 
 (defn secure-random
   "Generate a secure random sjcl.bn, takes a maximal value as an argument"
   [arg]
-  (let [n          (new bn arg)
-        byte-count (-> n .bitLength (/ 8) js/Math.ceil)
-        bytes      (secure-random-bytes byte-count)]
-    (assert (= (count bytes) byte-count)
+  (let [n            (new bn arg)
+        byte-count   (-> n .bitLength (/ 8) js/Math.ceil)
+        random-bytes (secure-random-bytes byte-count)]
+    (assert (= (count random-bytes) byte-count)
       "Did not retrieve proper correct number of bytes from random byte generator")
-    (-> bytes
+    (-> random-bytes
         (->> (map #(add-leading-zero-if-necessary
                     (.toString % 16)))
              (apply str)
