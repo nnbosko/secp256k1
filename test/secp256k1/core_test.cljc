@@ -552,14 +552,14 @@
       "&TexcsXqvbqeVrfpHQur5HvBqqQqBWB9XEsD"
       "TfBZ3DacgxVbem&&ggEXZtHxoNXgD5FWi2cLD")))
 
-;; TODO: test different output formats
 (deftest full-test
   (testing "Can generate a private key, public key, and SIN"
     (let [{priv      :private-key
            pub       :public-key
            timestamp :created} (secp256k1/generate-address-pair)
            sin (secp256k1/get-sin-from-public-key pub)]
-      (is (inst? timestamp))
+      #?(:cljs (is (inst? timestamp))
+         :clj (is (instance? java.util.Date timestamp)))
       (is (= pub (secp256k1/public-key priv)))
       (is (= (secp256k1/x962-encode pub)
              (secp256k1/x962-encode priv)))
