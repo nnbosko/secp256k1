@@ -54,6 +54,7 @@
                           "test,"
                           "npm" "install,"
                           "doo" "all" "test" "once,"
+                          "clean,"
                           "doo" "all" "test-advanced" "once,"]
    "advanced-test"       ["test-advanced"]
    "devcards"            ["do"

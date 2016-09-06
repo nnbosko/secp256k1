@@ -41,30 +41,30 @@ function bind(fn, thisArg) {
  * @final
  */
 secp256k1.polyfill.Promise = function (fn) {
-    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
-    if (typeof fn !== 'function') throw new TypeError('Not a function');
+    if (typeof this !== 'object') throw new Error('Promises must be constructed via new');
+    if (typeof fn !== 'function') throw new Error('Not a function');
 
     /**
      * @type {number}
-     * @public
+     * @protected
      */
     this._state = 0;
 
     /**
      * @type {boolean}
-     * @public
+     * @protected
      */
     this._handled = false;
 
     /**
      * @type {*}
-     * @public
+     * @protected
      */
     this._value = undefined;
 
     /**
      * @type {Array}
-     * @public
+     * @protected
      */
     this._deferreds = [];
 
@@ -123,7 +123,7 @@ function resolve(self, newValue) {
     try {
         // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
         if (newValue === self) { //noinspection ExceptionCaughtLocallyJS
-            throw new TypeError('A promise cannot be resolved with itself.');
+            throw new Error('A promise cannot be resolved with itself.');
         }
         if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
             var then = newValue.then;
@@ -159,19 +159,6 @@ function reject(self, newValue) {
  * @param {secp256k1.polyfill.Promise} self
  */
 function finale(self) {
-    //noinspection JSUnresolvedVariable
-    if (self._state === 2 &&
-        self._deferreds.length === 0 &&
-        typeof java === 'undefined' &&
-        typeof console !== 'undefined' &&
-        typeof console.warn === 'function') {
-        setTimeout(function() {
-            if (!self._handled) {
-                console.warn('Possible Unhandled Promise Rejection:', self._value);
-            }
-        }, 0);
-    }
-
     for (var i = 0, len = self._deferreds.length; i < len; i++) {
         handle(self, self._deferreds[i]);
     }
@@ -265,7 +252,7 @@ secp256k1.polyfill.Promise.all = function (arr) {
 
 /**
  * @param {*} value
- * @returns {*}
+ * @returns {secp256k1.polyfill.Promise}
  */
 secp256k1.polyfill.Promise.resolve = function (value) {
     if (value && typeof value === 'object' && value instanceof secp256k1.polyfill.Promise) {

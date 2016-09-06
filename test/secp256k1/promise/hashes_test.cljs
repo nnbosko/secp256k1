@@ -12,16 +12,17 @@
     (is (instance? Promise (new Promise (fn [_ reject] (reject 1))))))
   (async done
     (-> (new Promise (fn [resolve] (resolve 1)))
-      (.then (fn [val]
+      (.then
+        (fn [val]
                (is (= 1 val)
                  "Can pull value out in happy `resolve` path.")
                (done)))))
   (async done
-    (-> (new Promise (fn [_ reject] (reject 1)))
+    (-> (new Promise (fn [_ reject] (reject 2)))
       (.then
         (fn [_])
         (fn [val]
-          (is (= 1 val)
+          (is (= 2 val)
             "Can pull value out in sad `reject` path.")
           (done))))))
 
@@ -61,9 +62,9 @@
     "Synchronously throws an error when handed a keyword as an argument")
   (async done
     (-> (promise-hashes/sha256 :foo)
-      (.then #()
+      (.then
+        (fn [_])
         (fn [err]
           (is (instance? js/Error err)
             "Asynchronsly throws an error when handed a keyword argument")
-          (done)))))
-  )
+          (done))))))
