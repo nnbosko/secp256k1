@@ -11,7 +11,7 @@ goog.require('secp256k1.polyfill.Promise');
  * @const
  * @type {boolean}
  */
-var nativePromise = typeof window === "object" && typeof window['Promise'] === "function";
+var nativePromise = typeof Promise === "function";
 
 /**
  * Promise/A+ with fallback to a polyfill
@@ -20,33 +20,32 @@ var nativePromise = typeof window === "object" && typeof window['Promise'] === "
  * @struct
  * @final
  */
-secp256k1.Promise = nativePromise ? window['Promise'] : secp256k1.polyfill.Promise;
-
+secp256k1.Promise = nativePromise ? Promise : secp256k1.polyfill.Promise;
 
 /**
  * @param {Array<Function|secp256k1.Promise>} arr
  * @returns {secp256k1.polyfill.Promise}
  */
-secp256k1.Promise.all = nativePromise && typeof window['Promise']['all'] === "function" ?
-    window['Promise']['all'] : secp256k1.polyfill.Promise.all;
+secp256k1.Promise.all = nativePromise && typeof Promise['all'] === "function" ?
+    Promise['all'] : secp256k1.polyfill.Promise.all;
 
 /**
  * @param {*} value
  * @returns {secp256k1.Promise}
  */
-secp256k1.Promise.resolve = nativePromise && typeof window['Promise']['resolve'] === "function" ?
-    window['Promise']['resolve'] : secp256k1.polyfill.Promise.resolve;
+secp256k1.Promise.resolve = nativePromise && typeof Promise['resolve'] === "function" ?
+    Promise['resolve'] : secp256k1.polyfill.Promise.resolve;
 
 /**
  * @param {*} value
  * @returns {secp256k1.Promise}
  */
-secp256k1.Promise.reject = nativePromise && typeof window['Promise']['reject'] === "function" ?
-    window['Promise']['reject'] : secp256k1.polyfill.Promise.reject;
+secp256k1.Promise.reject = nativePromise && typeof Promise['reject'] === "function" ?
+    Promise['reject'] : secp256k1.polyfill.Promise.reject;
 
 /**
  * @param {Array<secp256k1.Promise>} values
  * @returns {secp256k1.Promise}
  */
-secp256k1.Promise.race = nativePromise && typeof window['Promise']['race'] === "function" ?
-    window['Promise']['race'] : secp256k1.polyfill.Promise.race;
+secp256k1.Promise.race = nativePromise && typeof Promise['race'] === "function" ?
+    Promise['race'] : secp256k1.polyfill.Promise.race;
