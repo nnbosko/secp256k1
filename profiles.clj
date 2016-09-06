@@ -29,7 +29,7 @@
   :doo {:paths {:slimer    "./node_modules/.bin/slimerjs"
                 :phantomjs "./node_modules/.bin/phantomjs"
                 :karma     "./node_modules/.bin/karma"}
-        :alias {:headless [:slimer :phantom :nashorn]
+        :alias {:headless [:slimer #_:phantom :nashorn]
                 :all      [:browsers :headless]}}
 
   :cljsbuild
