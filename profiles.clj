@@ -64,6 +64,6 @@
                           "shell" "rm" "-rf" "figwheel_server.log" "node_modules,"
                           "clean"]}}
 
- :profiles/linux {:doo {:alias {:browsers [:chrome :firefox]}}}
+ :profiles/linux {:doo {:alias {:browsers [#_:chrome :firefox]}}}
  :profiles/osx {:doo {:alias {:browsers [:chrome :firefox :safari]}}
                 :npm {:dependencies [[karma-safari-launcher "1.0.0"]]}}}
