@@ -6,8 +6,9 @@
             [cljs.test :refer-macros [is testing async]]
             [devcards.core :refer-macros [deftest]]))
 
+;; TODO: Migrate me to a clojure library
 (defn bitcoin-address
-  [data & {:keys [version output-format]
+  [data & {:keys [version       output-format]
            :or   {version       0x00
                   output-format :base58}}]
   (let [hash     (-> data
