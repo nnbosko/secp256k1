@@ -24,3 +24,4 @@ bitauth.iml
 figwheel_server.log
 .\#*
 /*.iml
+package-lock.json
