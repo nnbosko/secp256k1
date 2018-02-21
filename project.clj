@@ -9,9 +9,8 @@
   :source-paths ["src/clj" "src/cljs" "src/cljc" "src/js"]
   :test-paths ["test"]
   :dependencies [[org.bouncycastle/bcprov-jdk15on "1.55"]
-                 [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.229"]]
-
+                 [org.clojure/clojure "1.9.0"]
+                 [org.clojure/clojurescript "1.9.946"]]
 
   :clean-targets ^{:protect false}
   [:target-path

@@ -7,10 +7,11 @@
             [secp256k1.formatting.base-convert
              :refer [byte-array-to-base
                      base-to-byte-array
-                     base-to-base]])
+                     base-to-base]]
+            secp256k1.spec
+            [clojure.spec.alpha :as spec])
   (:import clojure.lang.Reflector
            java.security.SecureRandom
-           org.bouncycastle.asn1.sec.SECNamedCurves
            org.bouncycastle.crypto.digests.GeneralDigest
            org.bouncycastle.crypto.digests.SHA256Digest
            org.bouncycastle.crypto.generators.ECKeyPairGenerator
@@ -21,15 +22,7 @@
            org.bouncycastle.crypto.signers.ECDSASigner
            org.bouncycastle.math.ec.ECAlgorithms))
 
-(defonce
-  ^:private
-  ^{:doc "The secp256k1 curve object provided by BouncyCastle that is used often"}
-  curve
-  (let [params (SECNamedCurves/getByName "secp256k1")]
-    (ECDomainParameters. (.getCurve params)
-                         (.getG params)
-                         (.getN params)
-                         (.getH params))))
+(def private-key? (partial spec/valid? :secp256k1/private-key))
 
 (defprotocol PrivateKey
   (private-key [this] [this base]))
@@ -44,9 +37,7 @@
   (private-key
     ([priv-key _] (private-key priv-key))
     ([priv-key]
-     (assert (<= 1 priv-key) "Private key should be at least 1")
-     (assert (<= priv-key (.getN curve))
-             "Private key should be less than curve modulus")
+     (secp256k1.spec/assert :secp256k1/private-key priv-key)
      priv-key))
 
   clojure.lang.BigInt
@@ -62,18 +53,7 @@
          (base-to-byte-array base)
          private-key))))
 
-(defn- valid-point?
-  "Determine if an Secp256k1 point is valid"
-  [point]
-  (and (instance? org.bouncycastle.math.ec.ECPoint point)
-       (let [x       (-> point .getXCoord .toBigInteger)
-             y       (-> point .getYCoord .toBigInteger)
-             ecc     (.getCurve curve)
-             a       (-> ecc .getA .toBigInteger)
-             b       (-> ecc .getB .toBigInteger)
-             p       (-> ecc .getField .getCharacteristic)]
-         (= (mod (+ (* x x x) (* a x) b) p)
-            (mod (* y y) p)))))
+(def public-key? (partial spec/valid? :secp256k1/public-key))
 
 (defprotocol PublicKey
   (public-key [this] [this base]))
@@ -82,15 +62,15 @@
   (Class/forName "[B") ; byte-array
   (public-key
     ([data _] (public-key data))
-    ([data] (public-key (.decodePoint (.getCurve curve) data))))
+    ([data] (public-key (.decodePoint (.getCurve secp256k1.data/curve) data))))
 
   org.bouncycastle.math.ec.ECPoint ; Unboxed
   (public-key
     ([this _] (public-key this))
     ([this]
      (let [point (.normalize this)]
-       (assert (valid-point? point) "Invalid Point")
-       point)))
+      (secp256k1.spec/assert :secp256k1/public-key point)
+      point)))
 
   java.lang.String
   (public-key
@@ -101,10 +81,12 @@
   java.math.BigInteger ; Private key
   (public-key
     ([this _] (public-key this))
-    ([this] (-> curve
-                .getG
-                (.multiply (private-key this))
-                .normalize))))
+    ([this]
+     (secp256k1.spec/assert :secp256k1/private-key this)
+     (-> secp256k1.data/curve
+      .getG
+      (.multiply (private-key this))
+      .normalize))))
 
 (defn x962-decode
   "Decode a X9.62 encoded public key"
@@ -121,7 +103,7 @@
   (let [point (public-key pub-key input-format)
         x (-> point .getXCoord .toBigInteger)
         y (-> point .getYCoord .toBigInteger)]
-    (-> curve
+    (-> secp256k1.data/curve
         .getCurve
         (.createPoint x y compressed)
         .normalize
@@ -151,7 +133,7 @@
         (-> (ECKeyPairGenerator.)
             (doto (.init
                    (ECKeyGenerationParameters.
-                    curve
+                    secp256k1.data/curve
                     (SecureRandom.))))
             .generateKeyPair
             .getPrivate .getD
@@ -183,7 +165,7 @@
 (defn- compute-recovery-byte
   "Compute a recovery byte for a compressed ECDSA signature given R and S parameters"
   [kp r s]
-  (let [n       (.getN curve)
+  (let [n       (.getN secp256k1.data/curve)
         big-r?  (>= r n)
         big-s?  (>= (+ s s) n)
         y-odd?  (-> kp .getYCoord .toBigInteger (.testBit 0))]
@@ -204,14 +186,14 @@
                            recovery-byte true}}]
   (let [input    (base-to-byte-array data input-format)
         priv-key (private-key priv-key private-key-format)
-        rng      (deterministic-k-generator priv-key curve input)
-        n        (.getN curve)
+        rng      (deterministic-k-generator priv-key secp256k1.data/curve input)
+        n        (.getN secp256k1.data/curve)
         z        (BigInteger. 1 input)]
-    (assert (= (-> curve .getN .bitLength (/ 8)) (count input))
+    (assert (= (-> secp256k1.data/curve .getN .bitLength (/ 8)) (count input))
             "Hash must have the same number of bytes as curve")
     (loop []
       (let [k (.nextK rng)
-            kp (-> curve .getG (.multiply k) .normalize)
+            kp (-> secp256k1.data/curve .getG (.multiply k) .normalize)
             r (-> kp .getXCoord .toBigInteger (.mod n))
             s_ (-> k
                    (.modInverse n)
@@ -247,7 +229,7 @@
   (let [raw (->> x-coordinate
                  biginteger
                  .toByteArray)
-        l (-> curve .getN .bitLength (/ 8))
+        l (-> secp256k1.data/curve .getN .bitLength (/ 8))
         input (cond (= l (count raw)) raw
                     (< l (count raw)) (drop-while zero? raw)
                     (> l (count raw))
@@ -266,9 +248,9 @@
   recover and return the public key that generated the
   signature according to the algorithm in SEC1v2 section 4.1.6"
   [hash recovery-byte r s]
-  (assert (= (-> curve .getN .bitLength (/ 8))  (count hash))
+  (assert (= (-> secp256k1.data/curve .getN .bitLength (/ 8))  (count hash))
           (format "Hash should have %d bits (had %d)"
-                  (-> curve .getN .bitLength (/ 8))
+                  (-> secp256k1.data/curve .getN .bitLength (/ 8))
                   (count hash)))
   (assert (and (number? recovery-byte)
                (<= 0x1B recovery-byte)
@@ -280,11 +262,11 @@
         is-second-key? (odd? (-> recovery-byte
                                  (- 0x1B)
                                  (bit-shift-right 1)))
-        n (.getN curve)
+        n (.getN secp256k1.data/curve)
         R (compute-point y-even? (if is-second-key? (.add r n) r))
         e-inv (.subtract n (BigInteger. 1 hash))
         r-inv (.modInverse r n)]
-    (-> (ECAlgorithms/sumOfTwoMultiplies (.getG curve) e-inv R s)
+    (-> (ECAlgorithms/sumOfTwoMultiplies (.getG secp256k1.data/curve) e-inv R s)
         (.multiply r-inv)
         public-key)))
 
@@ -318,7 +300,7 @@
              public-key-format :hex}}]
   (let [bouncy-pub-key (-> key
                            (public-key public-key-format)
-                           (ECPublicKeyParameters. curve))
+                           (ECPublicKeyParameters. secp256k1.data/curve))
         verifier (doto (ECDSASigner.) (.init false bouncy-pub-key))
         {r :R, s :S} (DER-decode-ECDSA-signature
                       signature
@@ -368,19 +350,19 @@
   "Verify that a SIN is valid"
   [sin & {:keys [input-format]
           :or   {input-format :base58}}]
-    (let [pub-with-checksum (base-to-byte-array sin input-format)
-          len               (count pub-with-checksum)
-          expected-checksum (->> pub-with-checksum (drop 22) vec)
-          actual-checksum   (->> pub-with-checksum
-                                 (take 22)
-                                 sha256
-                                 sha256
-                                 (take 4)
-                                 vec)
-          prefix            (->> pub-with-checksum
-                                 (take 2)
-                                 vec)]
-      (and
-       (= len 26)
-       (= prefix [0x0f 0x02])
-       (= expected-checksum actual-checksum))))
+  (let [pub-with-checksum (base-to-byte-array sin input-format)
+        len               (count pub-with-checksum)
+        expected-checksum (->> pub-with-checksum (drop 22) vec)
+        actual-checksum   (->> pub-with-checksum
+                               (take 22)
+                               sha256
+                               sha256
+                               (take 4)
+                               vec)
+        prefix            (->> pub-with-checksum
+                               (take 2)
+                               vec)]
+    (and
+     (= len 26)
+     (= prefix [0x0f 0x02])
+     (= expected-checksum actual-checksum))))
