@@ -456,45 +456,45 @@
                secp256k1/private-key
                (secp256k1/sign "foo" :recovery-byte true)))
         "Recovery byte present (signing \"foo\")")
-              (is (= "1b3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
-                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                    secp256k1/private-key
-                    (secp256k1/sign "barr" :recovery-byte true)))
-             "Recovery byte present (signing \"bar\")")
-         (is (= "3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
-                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                    secp256k1/private-key
-                    (secp256k1/sign "barr" :recovery-byte false)))
-             "Recovery byte *NOT* present (signing \"bar\")")
-         (is (= "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
-                (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
-                    secp256k1/private-key
-                    (secp256k1/sign "foo" :recovery-byte false)))
-             "Recovery byte *NOT* present (signing \"foo\")")
-         (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
-                (secp256k1/sign
-                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "trololololol"
-                 :recovery-byte true)))
-         (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
-                (secp256k1/sign
-                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "trololololol")))
-         (is (= "GzBEAiBFm3gXzy+RYsNbXFrfbbDWxgX+QXcF5XcjcbnLbXr1fgIgRHlbQLkWcnoCARPPyzMSCI2fzWF8/q0Mt/9zB9Vsg88="
-                (secp256k1/sign
-                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "trololololol"
-                 :output-format :base64)))
-         (is (= "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7"
-                (secp256k1/sign-hash
-                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
-                 :output-format :hex)))
-         (is (= "HDBEAiAtuEl/RKoRm3pb27TqdcDzwDZeoHwWaLhhgqrET1dnwQIgQe6Z0IE4smzmmvei3p6/8JzuVyS3ZVdgMepDIrck8uc="
-                (secp256k1/sign-hash
-                 (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
-                 "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
-                 :output-format :base64)))))
+    (is (= "1b3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+         (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+             secp256k1/private-key
+             (secp256k1/sign "barr" :recovery-byte true)))
+     "Recovery byte present (signing \"bar\")")
+    (is (= "3045022100c738f07424690873da0afadd04a9afd4aedb3abe6db7cea6daed06a211c6dd6f02201c386378ab4e9438af27601a9887c361dd3c9661d04322c94393edb7cd8cd512"
+           (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+               secp256k1/private-key
+               (secp256k1/sign "barr" :recovery-byte false)))
+        "Recovery byte *NOT* present (signing \"bar\")")
+    (is (= "3045022100927247ae8b1d692d99096ea0a352ca99a4af84377af8152ccca671f24bc6169702206c3d28b9025d618c20612c4fdde67f052abf0e5e08c471c5c88baa96ce9538e1"
+           (-> "8295702b2273896ae085c3caebb02985cab02038251e10b6f67a14340edb51b0"
+               secp256k1/private-key
+               (secp256k1/sign "foo" :recovery-byte false)))
+        "Recovery byte *NOT* present (signing \"foo\")")
+    (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
+           (secp256k1/sign
+            (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+            "trololololol"
+            :recovery-byte true)))
+    (is (= "1b30440220459b7817cf2f9162c35b5c5adf6db0d6c605fe417705e5772371b9cb6d7af57e022044795b40b916727a020113cfcb3312088d9fcd617cfead0cb7ff7307d56c83cf"
+           (secp256k1/sign
+            (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+            "trololololol")))
+    (is (= "GzBEAiBFm3gXzy+RYsNbXFrfbbDWxgX+QXcF5XcjcbnLbXr1fgIgRHlbQLkWcnoCARPPyzMSCI2fzWF8/q0Mt/9zB9Vsg88="
+           (secp256k1/sign
+            (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+            "trololololol"
+            :output-format :base64)))
+    (is (= "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7"
+           (secp256k1/sign-hash
+            (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+            "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
+            :output-format :hex)))
+    (is (= "HDBEAiAtuEl/RKoRm3pb27TqdcDzwDZeoHwWaLhhgqrET1dnwQIgQe6Z0IE4smzmmvei3p6/8JzuVyS3ZVdgMepDIrck8uc="
+           (secp256k1/sign-hash
+            (secp256k1/private-key "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9")
+            "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
+            :output-format :base64)))))
 
 (deftest recovery-byte-tests
   (testing "Can recover a public key from a signature with a recovery byte"
@@ -519,8 +519,8 @@
              "22c49372a7506d162e6551fca36eb59235a9252c7f55610b8d0859d8752235a9"))
            (secp256k1/recover-public-key-from-hash
             "05fb71a4f43ae66ac23544b87449b60bbb4874d18b3270eba29c5c057c7805a4"
-            "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7")))
-    ))
+            "1c304402202db8497f44aa119b7a5bdbb4ea75c0f3c0365ea07c1668b86182aac44f5767c1022041ee99d08138b26ce69af7a2de9ebff09cee5724b765576031ea4322b724f2e7")))))
+
 
 ;; TODO: test different input formats
 (deftest sin-tests
